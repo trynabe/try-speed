@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Try-Speed — A modern, developer-aesthetic English typing practice app with custom timers, infinite mode, rich color themes, and real-time speed analysis.">
+  <meta name="theme-color" content="#18191c">
+  <title>Try-Speed</title>
+
+  <!-- Google Font (with robust system monospace fallback for offline) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/typing.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Header -->
+    <header class="app-header">
+      <a href="#" class="brand" aria-label="Try-Speed Home">
+        <div class="brand-icon">&gt;_</div>
+        <div class="brand-title">Try-<span>Speed</span></div>
+      </a>
+
+      <div class="header-actions">
+        <!-- Personal Best Indicator -->
+        <div class="best-badge" title="Personal best score for current mode">
+          <span>Best:</span>
+          <strong id="best-wpm-badge">--</strong>
+        </div>
+
+        <!-- History Button -->
+        <button id="history-btn" class="icon-btn" title="View Typing History" aria-label="View typing history">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </button>
+
+        <!-- Instructions Button -->
+        <button id="instructions-btn" class="icon-btn" title="How to Practice & Shortcuts" aria-label="How to practice and keyboard shortcuts">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
+
+        <!-- Audio / Sound Settings Button -->
+        <button id="sound-btn" class="icon-btn" title="Sound Profiles & Custom MP3" aria-label="Open sound settings and custom MP3 uploader">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </button>
+
+        <!-- Theme & Color Customizer Button -->
+        <button id="theme-btn" class="icon-btn" title="Choose Themes & Colors" aria-label="Open theme and color palette customizer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Typing Section -->
+    <main class="typing-section">
+      <!-- Controls Bar -->
+      <section class="controls-bar" aria-label="Practice settings">
+        <div class="control-group">
+          <span class="control-label">Duration:</span>
+          <div class="pill-group" role="radiogroup" aria-label="Select session duration">
+            <button class="pill-btn" data-duration="30" role="radio" aria-checked="false">30s</button>
+            <button class="pill-btn active" data-duration="60" role="radio" aria-checked="true">60s</button>
+            <button class="pill-btn" data-duration="120" role="radio" aria-checked="false">120s</button>
+            <button class="pill-btn" id="custom-duration-pill" data-duration="custom" role="radio" aria-checked="false" title="Set custom seconds or inf">Custom</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Difficulty:</span>
+          <div class="pill-group" role="radiogroup" aria-label="Select difficulty level">
+            <button class="pill-btn" data-difficulty="easy" role="radio" aria-checked="false">Easy</button>
+            <button class="pill-btn active" data-difficulty="medium" role="radio" aria-checked="true">Medium</button>
+            <button class="pill-btn" data-difficulty="hard" role="radio" aria-checked="false">Hard</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Live Stats Bar -->
+      <section class="stats-bar" aria-label="Live typing statistics">
+        <div class="stat-item">
+          <span class="stat-label">Time</span>
+          <div id="timer-display" class="stat-value timer-value">1:00</div>
+        </div>
+
+        <div class="stat-item">
+          <span class="stat-label">Speed</span>
+          <div class="stat-value"><span id="wpm-display">0</span> <small style="font-size: 0.85rem; color: var(--text-muted);">WPM</small></div>
+        </div>
+
+        <div class="stat-item">
+          <span class="stat-label">Accuracy</span>
+          <div id="accuracy-display" class="stat-value">100%</div>
+        </div>
+
+        <div class="stat-item">
+          <span class="stat-label">Characters (✓ / ✗)</span>
+          <div class="stat-counts">
+            <span id="correct-display" class="count-correct" title="Correct characters">0</span>
+            <span class="count-sep">/</span>
+            <span id="incorrect-display" class="count-incorrect" title="Incorrect characters">0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Typing Arena -->
+      <section class="typing-arena" id="typing-arena" aria-label="Typing text area">
+        <!-- Invisible input field to capture physical or mobile virtual keyboard inputs -->
+        <textarea
+          id="hidden-input"
+          class="hidden-input"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="none"
+          spellcheck="false"
+          inputmode="text"
+          aria-label="Type the text shown here"
+        ></textarea>
+
+        <!-- Formatted Text Display with Caret -->
+        <div id="text-display" class="text-display" aria-live="polite"></div>
+
+        <!-- Focus Overlay -->
+        <div id="focus-overlay" class="focus-overlay hidden" title="Click or tap to focus">
+          <div class="focus-message">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+              <line x1="6" y1="8" x2="6.01" y2="8"></line>
+              <line x1="10" y1="8" x2="10.01" y2="8"></line>
+              <line x1="14" y1="8" x2="14.01" y2="8"></line>
+              <line x1="18" y1="8" x2="18.01" y2="8"></line>
+              <line x1="6" y1="12" x2="6.01" y2="12"></line>
+              <line x1="18" y1="12" x2="18.01" y2="12"></line>
+              <line x1="8" y1="16" x2="16" y2="16"></line>
+            </svg>
+            <span>Click or press any key to focus</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Action Buttons -->
+      <div class="action-buttons">
+        <button id="restart-btn" class="btn btn-secondary" title="Restart test with same text (Ctrl+Enter)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"></path>
+          </svg>
+          <span>Restart</span>
+        </button>
+
+        <button id="new-text-btn" class="btn btn-primary" title="Generate fresh text (Esc)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          <span>New Text</span>
+        </button>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="shortcuts-hint">
+        <span class="kbd-shortcut"><kbd>Tab</kbd> + <kbd>Enter</kbd> / <kbd>Ctrl</kbd> + <kbd>Enter</kbd> Restart</span>
+        <span class="kbd-shortcut"><kbd>Esc</kbd> New text</span>
+        <span class="kbd-shortcut"><kbd>Backspace</kbd> Erase char</span>
+        <span class="kbd-shortcut"><kbd>Ctrl</kbd> + <kbd>Backspace</kbd> Erase word</span>
+      </div>
+      <div class="footer-credits">
+        Try-Speed &bull; Pure monospace typing practice
+      </div>
+    </footer>
+  </div>
+
+  <!-- Results Modal -->
+  <div id="results-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="results-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="results-title">Session Complete!</h2>
+      </div>
+
+      <div class="modal-body">
+        <div class="results-hero">
+          <div id="res-new-best" class="res-new-best hidden">🎉 New Personal Best!</div>
+          <div id="res-badge" class="res-badge badge-advanced">🔥 Fast & Accurate</div>
+          <div class="res-primary-stat">
+            <span id="res-wpm" class="res-val">0</span>
+            <span class="res-unit">WPM</span>
+          </div>
+        </div>
+
+        <div class="results-grid">
+          <div class="res-card">
+            <span class="res-card-label">Accuracy</span>
+            <span id="res-accuracy" class="res-card-val">100%</span>
+          </div>
+          <div class="res-card">
+            <span class="res-card-label">Raw WPM</span>
+            <span id="res-raw-wpm" class="res-card-val">0</span>
+          </div>
+          <div class="res-card">
+            <span class="res-card-label">Time Taken</span>
+            <span id="res-time" class="res-card-val">60s</span>
+          </div>
+          <div class="res-card">
+            <span class="res-card-label">Correct Chars</span>
+            <span id="res-correct" class="res-card-val" style="color: var(--correct)">0</span>
+          </div>
+          <div class="res-card">
+            <span class="res-card-label">Incorrect Chars</span>
+            <span id="res-incorrect" class="res-card-val" style="color: var(--incorrect)">0</span>
+          </div>
+          <div class="res-card">
+            <span class="res-card-label">Error Rate</span>
+            <span id="res-error-rate" class="res-card-val" style="color: var(--text-muted)">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="res-restart-btn" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"></path>
+            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"></path>
+          </svg>
+          <span>Retry Same Text</span>
+        </button>
+        <button id="res-next-btn" class="btn btn-primary">
+          <span>Next Text &rarr;</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Modal -->
+  <div id="history-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="history-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="history-title">Typing History & Stats</h2>
+        <button id="close-history-btn" class="modal-close-btn" aria-label="Close history modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="history-summary-grid">
+          <div class="hist-summary-card">
+            <div class="hist-summary-label">Total Tests</div>
+            <div id="hist-total-tests" class="hist-summary-val">0</div>
+          </div>
+          <div class="hist-summary-card">
+            <div class="hist-summary-label">Avg Speed</div>
+            <div class="hist-summary-val"><span id="hist-avg-wpm">0</span> <small>WPM</small></div>
+          </div>
+          <div class="hist-summary-card">
+            <div class="hist-summary-label">Avg Accuracy</div>
+            <div id="hist-avg-acc" class="hist-summary-val">0%</div>
+          </div>
+          <div class="hist-summary-card">
+            <div class="hist-summary-label">Highest WPM</div>
+            <div class="hist-summary-val"><span id="hist-best-wpm">0</span></div>
+          </div>
+        </div>
+
+        <h3 style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-top: 0.5rem;">Recent Sessions</h3>
+        <div id="history-list" class="history-list"></div>
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button id="clear-history-btn" class="btn btn-danger">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span>Clear History</span>
+        </button>
+        <button id="close-history-footer-btn" class="btn btn-secondary">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructions Modal -->
+  <div id="instructions-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="instructions-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="instructions-title">How to Practice — Try-Speed</h2>
+        <button id="close-instructions-btn" class="modal-close-btn" aria-label="Close instructions modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="instructions-section">
+          <h3>Getting Started</h3>
+          <p>Click or tap anywhere on the typing arena to begin. The timer starts automatically when you type the very first character—there is no countdown anxiety.</p>
+        </div>
+
+        <div class="instructions-section">
+          <h3>Durations & Unlimited Mode (inf)</h3>
+          <p>Choose 30s, 60s, 120s, or click <strong>Custom</strong> to enter any exact duration in seconds (e.g. 15, 45, 90) or type <strong>inf</strong> for endless zen practice!</p>
+        </div>
+
+        <div class="instructions-section">
+          <h3>Difficulty Levels</h3>
+          <ul>
+            <li><strong>Easy:</strong> High-frequency lowercase words for warming up and muscle memory.</li>
+            <li><strong>Medium:</strong> Natural sentences with standard capitalization, commas, and periods.</li>
+            <li><strong>Hard:</strong> Advanced vocabulary, numbers, dates, parentheses, and mixed punctuation.</li>
+          </ul>
+        </div>
+
+        <div class="instructions-section">
+          <h3>Keyboard Shortcuts</h3>
+          <table class="shortcuts-table">
+            <tbody>
+              <tr>
+                <td><kbd>Tab</kbd> + <kbd>Enter</kbd> / <kbd>Ctrl</kbd> + <kbd>Enter</kbd></td>
+                <td>Restart test with same text</td>
+              </tr>
+              <tr>
+                <td><kbd>Esc</kbd></td>
+                <td>Generate fresh text and reset</td>
+              </tr>
+              <tr>
+                <td><kbd>Backspace</kbd></td>
+                <td>Erase previous character</td>
+              </tr>
+              <tr>
+                <td><kbd>Ctrl</kbd> + <kbd>Backspace</kbd></td>
+                <td>Erase previous word</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="close-instructions-footer-btn" class="btn btn-primary">
+          Got It!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme & Color Customizer Modal -->
+  <div id="theme-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="theme-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="theme-title">Themes & Colors</h2>
+        <button id="close-theme-btn" class="modal-close-btn" aria-label="Close themes modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="instructions-section">
+          <h3>Preset Themes</h3>
+          <div class="themes-grid" id="themes-grid">
+            <!-- Dark Theme -->
+            <div class="theme-card active" data-theme-name="dark">
+              <div class="theme-card-name">Default Dark</div>
+              <div class="theme-swatches">
+                <span class="theme-dot" style="background: #18191c;"></span>
+                <span class="theme-dot" style="background: #e2b714;"></span>
+                <span class="theme-dot" style="background: #f0f2f5;"></span>
+              </div>
+            </div>
+
+            <!-- Light Theme -->
+            <div class="theme-card" data-theme-name="light">
+              <div class="theme-card-name">Clean Light</div>
+              <div class="theme-swatches">
+                <span class="theme-dot" style="background: #f5f6fa;"></span>
+                <span class="theme-dot" style="background: #d97706;"></span>
+                <span class="theme-dot" style="background: #1e2129;"></span>
+              </div>
+            </div>
+
+            <!-- Matrix Theme -->
+            <div class="theme-card" data-theme-name="matrix">
+              <div class="theme-card-name">Matrix Green</div>
+              <div class="theme-swatches">
+                <span class="theme-dot" style="background: #0a0e0a;"></span>
+                <span class="theme-dot" style="background: #00ff66;"></span>
+                <span class="theme-dot" style="background: #00ff66;"></span>
+              </div>
+            </div>
+
+            <!-- Dracula Theme -->
+            <div class="theme-card" data-theme-name="dracula">
+              <div class="theme-card-name">Dracula</div>
+              <div class="theme-swatches">
+                <span class="theme-dot" style="background: #282a36;"></span>
+                <span class="theme-dot" style="background: #bd93f9;"></span>
+                <span class="theme-dot" style="background: #ff79c6;"></span>
+              </div>
+            </div>
+
+            <!-- Cyberpunk Theme -->
+            <div class="theme-card" data-theme-name="cyberpunk">
+              <div class="theme-card-name">Cyberpunk</div>
+              <div class="theme-swatches">
+                <span class="theme-dot" style="background: #120e24;"></span>
+                <span class="theme-dot" style="background: #ffe600;"></span>
+                <span class="theme-dot" style="background: #00f0ff;"></span>
+              </div>
+            </div>
+
+            <!-- Nord Theme -->
+            <div class="theme-card" data-theme-name="nord">
+              <div class="theme-card-name">Nord</div>
+              <div class="theme-swatches">
+                <span class="theme-dot" style="background: #2e3440;"></span>
+                <span class="theme-dot" style="background: #88c0d0;"></span>
+                <span class="theme-dot" style="background: #eceff4;"></span>
+              </div>
+            </div>
+
+            <!-- Monokai Theme -->
+            <div class="theme-card" data-theme-name="monokai">
+              <div class="theme-card-name">Monokai</div>
+              <div class="theme-swatches">
+                <span class="theme-dot" style="background: #272822;"></span>
+                <span class="theme-dot" style="background: #e6db74;"></span>
+                <span class="theme-dot" style="background: #a6e22e;"></span>
+              </div>
+            </div>
+
+            <!-- Catppuccin Theme -->
+            <div class="theme-card" data-theme-name="catppuccin">
+              <div class="theme-card-name">Catppuccin</div>
+              <div class="theme-swatches">
+                <span class="theme-dot" style="background: #1e1e2e;"></span>
+                <span class="theme-dot" style="background: #cba6f7;"></span>
+                <span class="theme-dot" style="background: #cdd6f4;"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom Free Color Picker Section -->
+        <div class="instructions-section" style="margin-top: 1rem;">
+          <h3>Custom Color Palette</h3>
+          <p>Pick any colors freely to design your own personalized coding theme:</p>
+          <div class="custom-color-controls">
+            <div class="custom-color-row">
+              <span>Accent & Caret Color</span>
+              <div class="color-picker-wrapper">
+                <input type="color" id="custom-accent-picker" class="color-input" value="#e2b714">
+                <span id="custom-accent-hex" class="color-hex">#e2b714</span>
+              </div>
+            </div>
+            <div class="custom-color-row">
+              <span>Background Color</span>
+              <div class="color-picker-wrapper">
+                <input type="color" id="custom-bg-picker" class="color-input" value="#18191c">
+                <span id="custom-bg-hex" class="color-hex">#18191c</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="apply-custom-colors-btn" class="btn btn-secondary">
+          Apply Custom Colors
+        </button>
+        <button id="close-theme-footer-btn" class="btn btn-primary">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sound Settings & MP3 Upload Modal -->
+  <div id="sound-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="sound-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="sound-title">Keyboard Sound &amp; Profiles</h2>
+        <button id="close-sound-btn" class="modal-close-btn" aria-label="Close sound settings">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Master Enable / Disable Toggle -->
+        <div class="sound-toggle-row">
+          <div>
+            <strong style="display: block; font-size: 0.95rem; color: var(--text-main);">Sound Effects</strong>
+            <small style="color: var(--text-muted);">Enable mechanical key clicks while typing</small>
+          </div>
+          <button id="modal-sound-toggle-btn" class="btn btn-secondary" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;">
+            Muted
+          </button>
+        </div>
+
+        <!-- Built-in Switch Sound Profiles -->
+        <div class="instructions-section">
+          <h3>Switch Profiles</h3>
+          <div class="sound-profiles-grid" id="sound-profiles-grid">
+            <div class="sound-card active" data-profile="mechanical">
+              <div class="sound-card-name">Mechanical</div>
+              <div class="sound-card-desc">Tactile Blue switch click</div>
+            </div>
+            <div class="sound-card" data-profile="thock">
+              <div class="sound-card-name">Deep Thock</div>
+              <div class="sound-card-desc">Lubed Linear Red switch</div>
+            </div>
+            <div class="sound-card" data-profile="typewriter">
+              <div class="sound-card-name">Typewriter</div>
+              <div class="sound-card-desc">Vintage metallic clack</div>
+            </div>
+            <div class="sound-card" data-profile="pop">
+              <div class="sound-card-name">Bubble Pop</div>
+              <div class="sound-card-desc">Soft marimba drop</div>
+            </div>
+            <div class="sound-card" data-profile="beep">
+              <div class="sound-card-name">Retro Beep</div>
+              <div class="sound-card-desc">8-bit arcade blip</div>
+            </div>
+            <div class="sound-card" data-profile="custom">
+              <div class="sound-card-name">Custom MP3</div>
+              <div class="sound-card-desc" id="custom-sound-desc">Upload your sound</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload Custom MP3 Section -->
+        <div class="instructions-section">
+          <h3>Custom Audio File (.mp3, .wav, .ogg)</h3>
+          <div class="custom-audio-box">
+            <input type="file" id="sound-file-input" accept="audio/*" style="display: none;">
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem;">
+              Upload your own keyboard click sound. Saved locally in browser.
+            </p>
+            <div id="custom-file-status" class="hidden" style="margin-bottom: 0.4rem;">
+              <span class="audio-file-badge">
+                🎵 <span id="custom-filename">custom_sound.mp3</span>
+                <button id="clear-custom-audio-btn" style="background: none; border: none; color: var(--incorrect); cursor: pointer; font-size: 1rem; margin-left: 0.35rem;" title="Remove custom sound">&times;</button>
+              </span>
+            </div>
+            <button id="upload-sound-trigger-btn" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.45rem 1rem;">
+              📁 Choose Audio File
+            </button>
+          </div>
+        </div>
+
+        <!-- Volume Slider -->
+        <div class="instructions-section">
+          <h3>Volume</h3>
+          <div class="volume-slider-wrapper">
+            <span>🔈</span>
+            <input type="range" id="sound-volume-slider" class="volume-slider" min="0" max="100" value="80">
+            <span>🔊</span>
+            <span id="volume-val-label" style="font-size: 0.85rem; font-weight: 700; width: 45px; text-align: right;">80%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button id="test-sound-btn" class="btn btn-secondary">
+          <span>🔊 Test Sound</span>
+        </button>
+        <button id="close-sound-footer-btn" class="btn btn-primary">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Duration Modal -->
+  <div id="custom-duration-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="custom-dur-title">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h2 id="custom-dur-title">Set Custom Duration</h2>
+        <button id="close-custom-dur-btn" class="modal-close-btn" aria-label="Close duration modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="custom-duration-box">
+          <p style="color: var(--text-muted); font-size: 0.88rem;">
+            Enter the duration in seconds (e.g. <code>15</code>, <code>45</code>, <code>90</code>) or enter <code>inf</code> for unlimited practice:
+          </p>
+
+          <div class="duration-input-group">
+            <input
+              type="text"
+              id="custom-duration-input"
+              class="duration-input"
+              placeholder="e.g. 45 or inf"
+              autocomplete="off"
+            />
+          </div>
+
+          <div>
+            <span style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 0.4rem;">Quick Presets</span>
+            <div class="quick-durations">
+              <button class="quick-dur-btn" data-set-dur="15">15s</button>
+              <button class="quick-dur-btn" data-set-dur="45">45s</button>
+              <button class="quick-dur-btn" data-set-dur="90">90s</button>
+              <button class="quick-dur-btn" data-set-dur="inf">∞ inf (Zen Mode)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="cancel-custom-dur-btn" class="btn btn-secondary">Cancel</button>
+        <button id="apply-custom-dur-btn" class="btn btn-primary">Save & Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Script -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

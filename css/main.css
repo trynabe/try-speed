@@ -1,0 +1,405 @@
+/* ==========================================================================
+   Base & Theme Variables — Try-Speed Coding Aesthetic
+   ========================================================================== */
+:root {
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, Consolas, 'Courier New', monospace;
+  
+  /* Default Dark Theme */
+  --bg-primary: #18191c;
+  --bg-secondary: #222328;
+  --bg-tertiary: #2a2b32;
+  --bg-surface: rgba(34, 35, 40, 0.85);
+
+  --text-main: #f0f2f5;
+  --text-muted: #6e7382;
+  --text-dim: #484b56;
+
+  --accent: #e2b714;
+  --accent-hover: #f1c40f;
+  --accent-light: rgba(226, 183, 20, 0.15);
+
+  --correct: #22c55e;
+  --correct-dim: rgba(34, 197, 94, 0.2);
+  --incorrect: #ef4444;
+  --incorrect-bg: rgba(239, 68, 68, 0.25);
+
+  --caret-color: #e2b714;
+  --border-subtle: #2d3039;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  --bg-primary: #f5f6fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #eaecf1;
+  --bg-surface: rgba(255, 255, 255, 0.9);
+
+  --text-main: #1e2129;
+  --text-muted: #798194;
+  --text-dim: #b0b7c7;
+
+  --accent: #d97706;
+  --accent-hover: #b45309;
+  --accent-light: rgba(217, 119, 6, 0.12);
+
+  --correct: #16a34a;
+  --correct-dim: rgba(22, 163, 74, 0.15);
+  --incorrect: #dc2626;
+  --incorrect-bg: rgba(220, 38, 38, 0.18);
+
+  --caret-color: #d97706;
+  --border-subtle: #e2e5ec;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* Matrix Terminal Theme */
+[data-theme="matrix"] {
+  --bg-primary: #0a0e0a;
+  --bg-secondary: #101610;
+  --bg-tertiary: #172217;
+  --bg-surface: rgba(16, 22, 16, 0.9);
+
+  --text-main: #00ff66;
+  --text-muted: #008f39;
+  --text-dim: #004d1f;
+
+  --accent: #00ff66;
+  --accent-hover: #33ff85;
+  --accent-light: rgba(0, 255, 102, 0.15);
+
+  --correct: #00ff66;
+  --correct-dim: rgba(0, 255, 102, 0.2);
+  --incorrect: #ff3344;
+  --incorrect-bg: rgba(255, 51, 68, 0.25);
+
+  --caret-color: #00ff66;
+  --border-subtle: #1c2b1c;
+  --shadow-sm: 0 2px 8px rgba(0, 255, 102, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* Dracula Theme */
+[data-theme="dracula"] {
+  --bg-primary: #282a36;
+  --bg-secondary: #21222c;
+  --bg-tertiary: #343746;
+  --bg-surface: rgba(33, 34, 44, 0.9);
+
+  --text-main: #f8f8f2;
+  --text-muted: #6272a4;
+  --text-dim: #44475a;
+
+  --accent: #bd93f9;
+  --accent-hover: #d1b3ff;
+  --accent-light: rgba(189, 147, 249, 0.18);
+
+  --correct: #50fa7b;
+  --correct-dim: rgba(80, 250, 123, 0.2);
+  --incorrect: #ff5555;
+  --incorrect-bg: rgba(255, 85, 85, 0.25);
+
+  --caret-color: #ff79c6;
+  --border-subtle: #44475a;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Cyberpunk Neon Theme */
+[data-theme="cyberpunk"] {
+  --bg-primary: #120e24;
+  --bg-secondary: #1a1534;
+  --bg-tertiary: #27204f;
+  --bg-surface: rgba(26, 21, 52, 0.9);
+
+  --text-main: #00f0ff;
+  --text-muted: #7e6ebd;
+  --text-dim: #473c75;
+
+  --accent: #ffe600;
+  --accent-hover: #fff04d;
+  --accent-light: rgba(255, 230, 0, 0.18);
+
+  --correct: #00f0ff;
+  --correct-dim: rgba(0, 240, 255, 0.2);
+  --incorrect: #ff0055;
+  --incorrect-bg: rgba(255, 0, 85, 0.3);
+
+  --caret-color: #ffe600;
+  --border-subtle: #3a306c;
+  --shadow-sm: 0 2px 10px rgba(0, 240, 255, 0.12);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.65);
+}
+
+/* Nord Theme */
+[data-theme="nord"] {
+  --bg-primary: #2e3440;
+  --bg-secondary: #3b4252;
+  --bg-tertiary: #434c5e;
+  --bg-surface: rgba(59, 66, 82, 0.9);
+
+  --text-main: #eceff4;
+  --text-muted: #7e8eab;
+  --text-dim: #4c566a;
+
+  --accent: #88c0d0;
+  --accent-hover: #8fbcbb;
+  --accent-light: rgba(136, 192, 208, 0.16);
+
+  --correct: #a3be8c;
+  --correct-dim: rgba(163, 190, 140, 0.2);
+  --incorrect: #bf616a;
+  --incorrect-bg: rgba(191, 97, 106, 0.25);
+
+  --caret-color: #88c0d0;
+  --border-subtle: #4c566a;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* Monokai Theme */
+[data-theme="monokai"] {
+  --bg-primary: #272822;
+  --bg-secondary: #1e1f1c;
+  --bg-tertiary: #383830;
+  --bg-surface: rgba(30, 31, 28, 0.9);
+
+  --text-main: #f8f8f2;
+  --text-muted: #75715e;
+  --text-dim: #49483e;
+
+  --accent: #e6db74;
+  --accent-hover: #f4ea8a;
+  --accent-light: rgba(230, 219, 116, 0.16);
+
+  --correct: #a6e22e;
+  --correct-dim: rgba(166, 226, 46, 0.2);
+  --incorrect: #f92672;
+  --incorrect-bg: rgba(249, 38, 114, 0.25);
+
+  --caret-color: #e6db74;
+  --border-subtle: #49483e;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Catppuccin Mocha Theme */
+[data-theme="catppuccin"] {
+  --bg-primary: #1e1e2e;
+  --bg-secondary: #181825;
+  --bg-tertiary: #313244;
+  --bg-surface: rgba(24, 24, 37, 0.9);
+
+  --text-main: #cdd6f4;
+  --text-muted: #6c7086;
+  --text-dim: #45475a;
+
+  --accent: #cba6f7;
+  --accent-hover: #d9b8ff;
+  --accent-light: rgba(203, 166, 247, 0.16);
+
+  --correct: #a6e3a1;
+  --correct-dim: rgba(166, 227, 161, 0.2);
+  --incorrect: #f38ba8;
+  --incorrect-bg: rgba(243, 139, 168, 0.25);
+
+  --caret-color: #f5c2e7;
+  --border-subtle: #313244;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* ==========================================================================
+   Global Reset & Coding Typography (Applied Everywhere)
+   ========================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-mono) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  font-size: 15px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  font-family: var(--font-mono) !important;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.55;
+  letter-spacing: -0.01em;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+  overflow-x: hidden;
+}
+
+button, input, select, textarea {
+  font-family: var(--font-mono) !important;
+}
+
+.app-wrapper {
+  max-width: 1060px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* ==========================================================================
+   Header & Top Navigation
+   ========================================================================== */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+  color: var(--text-main);
+}
+
+.brand-icon {
+  width: 38px;
+  height: 38px;
+  background: var(--accent-light);
+  color: var(--accent);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.15rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.brand-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.brand-title span {
+  color: var(--accent);
+}
+
+.brand-tagline {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-left: 0.5rem;
+  font-weight: 500;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.best-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.best-badge strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.icon-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  color: var(--text-main);
+  background: var(--bg-tertiary);
+  border-color: var(--accent);
+}
+
+.icon-btn.active {
+  color: var(--accent);
+  background: var(--accent-light);
+  border-color: var(--accent);
+}
+
+/* ==========================================================================
+   Footer & Keyboard Hints
+   ========================================================================== */
+.app-footer {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.shortcuts-hint {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.kbd-shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+kbd {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text-main);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.footer-credits {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
