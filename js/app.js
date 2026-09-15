@@ -45,6 +45,9 @@ class TypingApp {
         this.ui.updateCharacterStates(this.typingEngine.charStates, metrics.currentIndex);
         this.ui.updateLiveMetrics(metrics);
       },
+      onMetricsChange: (metrics) => {
+        this.ui.updateLiveMetrics(metrics);
+      },
       onFirstKeystroke: () => {
         this.timer.start();
       },

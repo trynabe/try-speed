@@ -4,7 +4,7 @@
  */
 
 export class TypingEngine {
-  constructor({ onStateChange, onFirstKeystroke, onComplete, onSound } = {}) {
+  constructor({ onStateChange, onMetricsChange, onFirstKeystroke, onComplete, onSound } = {}) {
     this.targetText = '';
     this.charStates = []; // Array of { char: string, state: 'pending'|'correct'|'incorrect'|'extra' }
     this.currentIndex = 0;
@@ -19,6 +19,8 @@ export class TypingEngine {
 
     // Callbacks
     this.onStateChange = onStateChange || (() => {});
+    // metrics-only channel: numbers change every tick, the text does not
+    this.onMetricsChange = onMetricsChange || this.onStateChange || (() => {});
     this.onFirstKeystroke = onFirstKeystroke || (() => {});
     this.onComplete = onComplete || (() => {});
     this.onSound = onSound || (() => {});
@@ -43,7 +45,8 @@ export class TypingEngine {
 
   setElapsedSeconds(seconds) {
     this.elapsedSeconds = seconds;
-    this.onStateChange(this.getMetrics());
+    // WPM/accuracy only — do NOT re-touch the character spans here
+    this.onMetricsChange(this.getMetrics());
   }
 
   handleInput(key, ctrlKey = false) {

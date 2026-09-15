@@ -208,15 +208,20 @@
   justify-content: center;
   padding: 1.5rem;
   z-index: 100;
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.25s ease, visibility 0.25s ease;
+  animation: backdropEnter 0.18s ease;
 }
 
+/*
+ * display:none, not opacity:0. Six fixed full-screen backdrop-filter layers
+ * kept alive in the DOM cost GPU work on every single frame.
+ */
 .modal-backdrop.hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+  display: none;
+}
+
+@keyframes backdropEnter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .modal-card {

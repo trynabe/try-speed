@@ -34,24 +34,44 @@ export class UIController {
     // Caret element
     this.caret = null;
     this.charElements = [];
+
+    // Render caches — avoid touching the DOM / reading layout on every keystroke
+    this.isSpaceFlags = [];
+    this.appliedClasses = [];
+    this.charPos = [];
+    this.linePitch = 0;
+    this.scrollTopCache = 0;
+    this._blinkTimer = null;
+
+    // Char geometry only changes when the box resizes
+    window.addEventListener('resize', () => {
+      if (this.charElements.length) this.measurePositions();
+    });
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        if (this.charElements.length) this.measurePositions();
+      });
+    }
   }
 
   renderText(text) {
     if (!this.textDisplay) return;
-    this.textDisplay.innerHTML = '';
-    this.charElements = [];
 
-    // Create caret
+    this.charElements = [];
+    this.isSpaceFlags = [];
+    this.appliedClasses = [];
+
+    // Build off-document: one reflow instead of one per appended node
+    const frag = document.createDocumentFragment();
+
     this.caret = document.createElement('span');
     this.caret.className = 'caret';
-    this.textDisplay.appendChild(this.caret);
+    frag.appendChild(this.caret);
 
-    // Split into words to prevent unnatural mid-word line wrapping
     const words = text.split(' ');
-    let charGlobalIndex = 0;
-    this.textDisplay.scrollTop = 0;
 
-    words.forEach((word, wIdx) => {
+    for (let w = 0; w < words.length; w++) {
+      const word = words[w];
       const wordSpan = document.createElement('span');
       wordSpan.className = 'word';
 
@@ -59,40 +79,67 @@ export class UIController {
         const charSpan = document.createElement('span');
         charSpan.className = 'char pending';
         charSpan.textContent = word[i];
-        charSpan.dataset.index = charGlobalIndex;
         wordSpan.appendChild(charSpan);
         this.charElements.push(charSpan);
-        charGlobalIndex++;
+        this.isSpaceFlags.push(false);
+        this.appliedClasses.push('char pending');
       }
 
-      // Add trailing space inside wordSpan (except after the last word)
-      if (wIdx < words.length - 1) {
+      if (w < words.length - 1) {
         const spaceSpan = document.createElement('span');
         spaceSpan.className = 'char char-space pending';
         spaceSpan.textContent = ' ';
-        spaceSpan.dataset.index = charGlobalIndex;
         wordSpan.appendChild(spaceSpan);
         this.charElements.push(spaceSpan);
-        charGlobalIndex++;
+        this.isSpaceFlags.push(true);
+        this.appliedClasses.push('char char-space pending');
       }
 
-      this.textDisplay.appendChild(wordSpan);
-    });
+      frag.appendChild(wordSpan);
+    }
 
+    this.textDisplay.innerHTML = '';
+    this.textDisplay.appendChild(frag);
+    this.textDisplay.scrollTop = 0;
+    this.scrollTopCache = 0;
+
+    this.measurePositions();
     this.updateCaretPosition(0);
   }
 
-  updateCharacterStates(charStates, currentIndex) {
-    for (let i = 0; i < this.charElements.length; i++) {
-      const el = this.charElements[i];
-      const stateObj = charStates[i];
+  /**
+   * Measure every char once. The text never reflows mid-session, so the caret
+   * can read these numbers instead of forcing a layout on every keystroke.
+   */
+  measurePositions() {
+    const n = this.charElements.length;
+    this.charPos = new Array(n);
 
+    for (let i = 0; i < n; i++) {
+      const el = this.charElements[i];
+      this.charPos[i] = {
+        left: el.offsetLeft,
+        top: el.offsetTop,
+        right: el.offsetLeft + el.offsetWidth
+      };
+    }
+
+    const firstWord = this.textDisplay.querySelector('.word');
+    this.linePitch = firstWord ? firstWord.offsetHeight : 42;
+
+    if (this.caret && this.charElements[0]) {
+      this.caret.style.height = `${Math.round(this.charElements[0].offsetHeight) || 26}px`;
+    }
+  }
+
+  updateCharacterStates(charStates, currentIndex) {
+    const n = this.charElements.length;
+
+    for (let i = 0; i < n; i++) {
+      const stateObj = charStates[i];
       if (!stateObj) continue;
 
-      let cls = 'char';
-      if (el.classList.contains('char-space')) {
-        cls += ' char-space';
-      }
+      let cls = this.isSpaceFlags[i] ? 'char char-space' : 'char';
 
       if (i < currentIndex) {
         cls += stateObj.state === 'correct' ? ' correct' : ' incorrect';
@@ -100,11 +147,13 @@ export class UIController {
         cls += ' pending';
       }
 
-      if (i === currentIndex) {
-        cls += ' active-char';
-      }
+      if (i === currentIndex) cls += ' active-char';
 
-      el.className = cls;
+      // Write only the 1-2 chars that actually changed
+      if (this.appliedClasses[i] !== cls) {
+        this.appliedClasses[i] = cls;
+        this.charElements[i].className = cls;
+      }
     }
 
     this.updateCaretPosition(currentIndex);
@@ -112,41 +161,44 @@ export class UIController {
 
   updateCaretPosition(index) {
     if (!this.caret || !this.textDisplay) return;
+    if (!this.charPos || this.charPos.length === 0) return;
 
-    if (index >= 0 && index < this.charElements.length) {
-      const targetChar = this.charElements[index];
-      const displayRect = this.textDisplay.getBoundingClientRect();
-      const charRect = targetChar.getBoundingClientRect();
+    let left;
+    let top;
 
-      const left = charRect.left - displayRect.left;
-      const top = (charRect.top - displayRect.top) + this.textDisplay.scrollTop;
-
-      this.caret.style.left = `${left}px`;
-      this.caret.style.top = `${top}px`;
-      this.caret.style.height = `${Math.round(charRect.height) || 26}px`;
-
-      // Measure line pitch dynamically from the word element
-      const firstWord = this.textDisplay.querySelector('.word');
-      const linePitch = firstWord ? firstWord.offsetHeight : 42;
-
-      // Determine current line (0-indexed)
-      const currentLineIndex = Math.max(0, Math.floor((top + 5) / linePitch));
-
-      // Keep active line centered on middle line of 3-line viewport
-      const targetScrollTop = currentLineIndex >= 2 ? (currentLineIndex - 1) * linePitch : 0;
-
-      if (Math.abs(this.textDisplay.scrollTop - targetScrollTop) > 1) {
-        this.textDisplay.scrollTop = targetScrollTop;
-      }
-    } else if (this.charElements.length > 0 && index >= this.charElements.length) {
-      // Position caret at end of last char
-      const lastChar = this.charElements[this.charElements.length - 1];
-      const displayRect = this.textDisplay.getBoundingClientRect();
-      const charRect = lastChar.getBoundingClientRect();
-
-      this.caret.style.left = `${charRect.right - displayRect.left}px`;
-      this.caret.style.top = `${(charRect.top - displayRect.top) + this.textDisplay.scrollTop}px`;
+    if (index >= 0 && index < this.charPos.length) {
+      left = this.charPos[index].left;
+      top = this.charPos[index].top;
+    } else {
+      const last = this.charPos[this.charPos.length - 1];
+      left = last.right;
+      top = last.top;
     }
+
+    const pitch = this.linePitch || 42;
+    const currentLineIndex = Math.max(0, Math.round(top / pitch));
+    const targetScrollTop = currentLineIndex >= 2 ? (currentLineIndex - 1) * pitch : 0;
+
+    // Write-only: never read scrollTop back, that would force a reflow
+    if (this.scrollTopCache !== targetScrollTop) {
+      this.scrollTopCache = targetScrollTop;
+      this.textDisplay.scrollTop = targetScrollTop;
+    }
+
+    // transform is compositor-only; left/top would relayout every keystroke
+    this.caret.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+
+    this.markTyping();
+  }
+
+  /** Freeze the blink while keys are coming in — blinking mid-word reads as lag. */
+  markTyping() {
+    if (!this.caret) return;
+    this.caret.classList.add('typing');
+    clearTimeout(this._blinkTimer);
+    this._blinkTimer = setTimeout(() => {
+      if (this.caret) this.caret.classList.remove('typing');
+    }, 700);
   }
 
   updateLiveMetrics({ wpm, accuracy, correctChars, incorrectChars }) {
