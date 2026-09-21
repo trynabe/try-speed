@@ -830,6 +830,21 @@
 }
 
 @media (max-width: 480px) {
+  .app-header { flex-wrap: wrap; gap: 0.75rem; }
+  .brand { flex-shrink: 0; }
+  .brand-title { white-space: nowrap; }
+  .header-actions { width: 100%; gap: 0.4rem; }
+  .icon-btn { flex-shrink: 0; }
+  .best-badge { min-width: 0; flex: 1; padding: 0.35rem; font-size: 0.7rem; flex-wrap: wrap; gap: 0.2rem; }
+  .best-badge strong { overflow-wrap: anywhere; }
+  .control-group { flex-wrap: wrap; min-width: 0; }
+  .control-label { width: 100%; }
+  .pill-group { width: 100%; min-width: 0; }
+  .pill-btn { flex: 1; padding: 0.4rem; }
+  .modal-backdrop { padding: 0.75rem; }
+  .modal-header, .modal-body, .modal-footer { padding: 1rem; }
+  .modal-header h2 { font-size: 1rem; }
+  .custom-color-row, .sound-toggle-row { flex-wrap: wrap; gap: 0.75rem; }
   .brand-title {
     font-size: 1.15rem;
   }
@@ -840,5 +855,21 @@
 
   .results-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+.theme-card, .sound-card { text-align: left; }
+.modal-card, .duration-input, .volume-slider { min-width: 0; }
+.duration-input { width: 100%; }
+.action-buttons, .modal-footer { flex-wrap: wrap; }
+.themes-grid, .sound-profiles-grid { grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr)); }
+.audio-file-badge { max-width: 100%; overflow-wrap: anywhere; }
+#custom-filename { min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }

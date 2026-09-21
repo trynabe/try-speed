@@ -5,9 +5,11 @@
  */
 
 export class Timer {
-  constructor(duration, { onTick, onComplete } = {}) {
+  constructor(duration, { onTick, onComplete, now = () => performance.now() } = {}) {
+    this.now = now;
     this.isInfinite = duration === 'inf' || duration === Infinity;
-    this.totalDuration = this.isInfinite ? 'inf' : Number(duration);
+    const seconds = Number(duration);
+    this.totalDuration = this.isInfinite ? 'inf' : (Number.isFinite(seconds) ? Math.max(1, seconds) : 60);
     this.remainingSeconds = this.isInfinite ? Infinity : this.totalDuration;
     this.elapsedSeconds = 0;
     this.isRunning = false;
@@ -15,46 +17,49 @@ export class Timer {
     this.timerId = null;
     this.onTick = onTick || (() => {});
     this.onComplete = onComplete || (() => {});
+    this.isCompleted = false;
   }
 
   setDuration(duration) {
     this.stop();
     this.isInfinite = duration === 'inf' || duration === Infinity;
-    this.totalDuration = this.isInfinite ? 'inf' : Math.max(1, Number(duration));
+    const seconds = Number(duration);
+    this.totalDuration = this.isInfinite ? 'inf' : (Number.isFinite(seconds) ? Math.max(1, seconds) : 60);
     this.remainingSeconds = this.isInfinite ? Infinity : this.totalDuration;
     this.elapsedSeconds = 0;
+    this.startTime = null;
+    this.isCompleted = false;
   }
 
   start() {
-    if (this.isRunning) return;
+    if (this.isRunning || this.isCompleted) return;
     this.isRunning = true;
-    this.startTime = Date.now() - (this.elapsedSeconds * 1000);
+    this.startTime = this.now() - (this.elapsedSeconds * 1000);
 
-    this.timerId = setInterval(() => {
-      const now = Date.now();
-      const elapsedMs = now - this.startTime;
-      this.elapsedSeconds = elapsedMs / 1000;
+    this.timerId = setInterval(() => this.tick(), 100);
+  }
 
-      if (this.isInfinite) {
-        this.onTick('inf', this.elapsedSeconds);
-      } else {
-        this.remainingSeconds = Math.max(0, Math.ceil(this.totalDuration - this.elapsedSeconds));
-        this.onTick(this.remainingSeconds, this.elapsedSeconds);
-
-        if (this.elapsedSeconds >= this.totalDuration) {
-          this.stop();
-          this.onComplete(this.totalDuration);
-        }
-      }
-    }, 100);
+  tick() {
+    if (!this.isRunning) return;
+    this.elapsedSeconds = this.getElapsedSeconds();
+    this.remainingSeconds = this.isInfinite ? Infinity : Math.max(0, Math.ceil(this.totalDuration - this.elapsedSeconds));
+    const finished = !this.isInfinite && this.elapsedSeconds >= this.totalDuration;
+    if (finished) {
+      this.stop();
+      this.isCompleted = true;
+    }
+    this.onTick(this.isInfinite ? 'inf' : this.remainingSeconds, this.elapsedSeconds);
+    if (finished) this.onComplete(this.elapsedSeconds);
   }
 
   stop() {
-    if (this.timerId) {
+    if (this.isRunning) this.elapsedSeconds = this.getElapsedSeconds();
+    if (this.timerId !== null) {
       clearInterval(this.timerId);
       this.timerId = null;
     }
     this.isRunning = false;
+    return this.elapsedSeconds;
   }
 
   reset() {
@@ -62,10 +67,12 @@ export class Timer {
     this.remainingSeconds = this.isInfinite ? Infinity : this.totalDuration;
     this.elapsedSeconds = 0;
     this.startTime = null;
+    this.isCompleted = false;
     this.onTick(this.isInfinite ? 'inf' : this.remainingSeconds, 0);
   }
 
   getElapsedSeconds() {
-    return Math.max(0.1, this.elapsedSeconds);
+    const elapsed = this.isRunning ? Math.max(0, (this.now() - this.startTime) / 1000) : this.elapsedSeconds;
+    return this.isInfinite ? elapsed : Math.min(this.totalDuration, elapsed);
   }
 }

@@ -133,9 +133,8 @@ export const TextGenerator = (() => {
       // Avoid consecutive duplicate words
       let word = shuffledPool[poolIndex++];
       if (resultWords.length > 0 && resultWords[resultWords.length - 1].toLowerCase() === word.toLowerCase()) {
-        if (poolIndex < shuffledPool.length) {
-          word = shuffledPool[poolIndex++];
-        }
+        const replacement = wordPool.find(candidate => candidate.toLowerCase() !== word.toLowerCase());
+        if (replacement) word = replacement;
       }
 
       resultWords.push(word);

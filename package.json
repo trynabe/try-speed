@@ -1,0 +1,13 @@
+{
+  "name": "try-speed",
+  "version": "1.0.2",
+  "description": "A modern, developer-aesthetic English typing practice web application",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node tests/test_engine.js && node tests/test_suite.js && node --test tests/regressions.test.js tests/audio.test.js"
+  }
+}

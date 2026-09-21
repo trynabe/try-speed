@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Try-Speed — A modern, developer-aesthetic English typing practice app with custom timers, infinite mode, rich color themes, and real-time speed analysis.">
   <meta name="theme-color" content="#18191c">
   <title>Try-Speed</title>
@@ -136,7 +136,7 @@
         ></textarea>
 
         <!-- Formatted Text Display with Caret -->
-        <div id="text-display" class="text-display" aria-live="polite"></div>
+        <div id="text-display" class="text-display"></div>
 
         <!-- Focus Overlay -->
         <div id="focus-overlay" class="focus-overlay hidden" title="Click or tap to focus">
@@ -172,6 +172,7 @@
           </svg>
           <span>New Text</span>
         </button>
+        <button id="finish-btn" class="btn btn-secondary hidden" disabled>Finish &amp; Save</button>
       </div>
     </main>
 
@@ -258,9 +259,10 @@
       </div>
 
       <div class="modal-body">
+        <p>Summary of your latest 100 sessions. Personal bests include all saved sessions.</p>
         <div class="history-summary-grid">
           <div class="hist-summary-card">
-            <div class="hist-summary-label">Total Tests</div>
+            <div class="hist-summary-label">Recent Tests</div>
             <div id="hist-total-tests" class="hist-summary-val">0</div>
           </div>
           <div class="hist-summary-card">
@@ -319,7 +321,7 @@
           <h3>Difficulty Levels</h3>
           <ul>
             <li><strong>Easy:</strong> High-frequency lowercase words for warming up and muscle memory.</li>
-            <li><strong>Medium:</strong> Natural sentences with standard capitalization, commas, and periods.</li>
+            <li><strong>Medium:</strong> Randomized English words with capitalization, commas, and periods.</li>
             <li><strong>Hard:</strong> Advanced vocabulary, numbers, dates, parentheses, and mixed punctuation.</li>
           </ul>
         </div>
@@ -370,84 +372,84 @@
           <h3>Preset Themes</h3>
           <div class="themes-grid" id="themes-grid">
             <!-- Dark Theme -->
-            <div class="theme-card active" data-theme-name="dark">
-              <div class="theme-card-name">Default Dark</div>
-              <div class="theme-swatches">
+            <button type="button" class="theme-card active" data-theme-name="dark" aria-pressed="true">
+              <span class="theme-card-name">Default Dark</span>
+              <span class="theme-swatches">
                 <span class="theme-dot" style="background: #18191c;"></span>
                 <span class="theme-dot" style="background: #e2b714;"></span>
                 <span class="theme-dot" style="background: #f0f2f5;"></span>
-              </div>
-            </div>
+              </span>
+            </button>
 
             <!-- Light Theme -->
-            <div class="theme-card" data-theme-name="light">
-              <div class="theme-card-name">Clean Light</div>
-              <div class="theme-swatches">
+            <button type="button" class="theme-card" data-theme-name="light" aria-pressed="false">
+              <span class="theme-card-name">Clean Light</span>
+              <span class="theme-swatches">
                 <span class="theme-dot" style="background: #f5f6fa;"></span>
                 <span class="theme-dot" style="background: #d97706;"></span>
                 <span class="theme-dot" style="background: #1e2129;"></span>
-              </div>
-            </div>
+              </span>
+            </button>
 
             <!-- Matrix Theme -->
-            <div class="theme-card" data-theme-name="matrix">
-              <div class="theme-card-name">Matrix Green</div>
-              <div class="theme-swatches">
+            <button type="button" class="theme-card" data-theme-name="matrix" aria-pressed="false">
+              <span class="theme-card-name">Matrix Green</span>
+              <span class="theme-swatches">
                 <span class="theme-dot" style="background: #0a0e0a;"></span>
                 <span class="theme-dot" style="background: #00ff66;"></span>
                 <span class="theme-dot" style="background: #00ff66;"></span>
-              </div>
-            </div>
+              </span>
+            </button>
 
             <!-- Dracula Theme -->
-            <div class="theme-card" data-theme-name="dracula">
-              <div class="theme-card-name">Dracula</div>
-              <div class="theme-swatches">
+            <button type="button" class="theme-card" data-theme-name="dracula" aria-pressed="false">
+              <span class="theme-card-name">Dracula</span>
+              <span class="theme-swatches">
                 <span class="theme-dot" style="background: #282a36;"></span>
                 <span class="theme-dot" style="background: #bd93f9;"></span>
                 <span class="theme-dot" style="background: #ff79c6;"></span>
-              </div>
-            </div>
+              </span>
+            </button>
 
             <!-- Cyberpunk Theme -->
-            <div class="theme-card" data-theme-name="cyberpunk">
-              <div class="theme-card-name">Cyberpunk</div>
-              <div class="theme-swatches">
+            <button type="button" class="theme-card" data-theme-name="cyberpunk" aria-pressed="false">
+              <span class="theme-card-name">Cyberpunk</span>
+              <span class="theme-swatches">
                 <span class="theme-dot" style="background: #120e24;"></span>
                 <span class="theme-dot" style="background: #ffe600;"></span>
                 <span class="theme-dot" style="background: #00f0ff;"></span>
-              </div>
-            </div>
+              </span>
+            </button>
 
             <!-- Nord Theme -->
-            <div class="theme-card" data-theme-name="nord">
-              <div class="theme-card-name">Nord</div>
-              <div class="theme-swatches">
+            <button type="button" class="theme-card" data-theme-name="nord" aria-pressed="false">
+              <span class="theme-card-name">Nord</span>
+              <span class="theme-swatches">
                 <span class="theme-dot" style="background: #2e3440;"></span>
                 <span class="theme-dot" style="background: #88c0d0;"></span>
                 <span class="theme-dot" style="background: #eceff4;"></span>
-              </div>
-            </div>
+              </span>
+            </button>
 
             <!-- Monokai Theme -->
-            <div class="theme-card" data-theme-name="monokai">
-              <div class="theme-card-name">Monokai</div>
-              <div class="theme-swatches">
+            <button type="button" class="theme-card" data-theme-name="monokai" aria-pressed="false">
+              <span class="theme-card-name">Monokai</span>
+              <span class="theme-swatches">
                 <span class="theme-dot" style="background: #272822;"></span>
                 <span class="theme-dot" style="background: #e6db74;"></span>
                 <span class="theme-dot" style="background: #a6e22e;"></span>
-              </div>
-            </div>
+              </span>
+            </button>
 
             <!-- Catppuccin Theme -->
-            <div class="theme-card" data-theme-name="catppuccin">
-              <div class="theme-card-name">Catppuccin</div>
-              <div class="theme-swatches">
+            <button type="button" class="theme-card" data-theme-name="catppuccin" aria-pressed="false">
+              <span class="theme-card-name">Catppuccin</span>
+              <span class="theme-swatches">
                 <span class="theme-dot" style="background: #1e1e2e;"></span>
                 <span class="theme-dot" style="background: #cba6f7;"></span>
                 <span class="theme-dot" style="background: #cdd6f4;"></span>
-              </div>
-            </div>
+              </span>
+            </button>
           </div>
         </div>
 
@@ -459,14 +461,14 @@
             <div class="custom-color-row">
               <span>Accent & Caret Color</span>
               <div class="color-picker-wrapper">
-                <input type="color" id="custom-accent-picker" class="color-input" value="#e2b714">
+                <input type="color" aria-label="Accent and caret color" id="custom-accent-picker" class="color-input" value="#e2b714">
                 <span id="custom-accent-hex" class="color-hex">#e2b714</span>
               </div>
             </div>
             <div class="custom-color-row">
               <span>Background Color</span>
               <div class="color-picker-wrapper">
-                <input type="color" id="custom-bg-picker" class="color-input" value="#18191c">
+                <input type="color" aria-label="Background color" id="custom-bg-picker" class="color-input" value="#18191c">
                 <span id="custom-bg-hex" class="color-hex">#18191c</span>
               </div>
             </div>
@@ -509,30 +511,30 @@
         <div class="instructions-section">
           <h3>Switch Profiles</h3>
           <div class="sound-profiles-grid" id="sound-profiles-grid">
-            <div class="sound-card active" data-profile="mechanical">
-              <div class="sound-card-name">Mechanical</div>
-              <div class="sound-card-desc">Tactile Blue switch click</div>
-            </div>
-            <div class="sound-card" data-profile="thock">
-              <div class="sound-card-name">Deep Thock</div>
-              <div class="sound-card-desc">Lubed Linear Red switch</div>
-            </div>
-            <div class="sound-card" data-profile="typewriter">
-              <div class="sound-card-name">Typewriter</div>
-              <div class="sound-card-desc">Vintage metallic clack</div>
-            </div>
-            <div class="sound-card" data-profile="pop">
-              <div class="sound-card-name">Bubble Pop</div>
-              <div class="sound-card-desc">Soft marimba drop</div>
-            </div>
-            <div class="sound-card" data-profile="beep">
-              <div class="sound-card-name">Retro Beep</div>
-              <div class="sound-card-desc">8-bit arcade blip</div>
-            </div>
-            <div class="sound-card" data-profile="custom">
-              <div class="sound-card-name">Custom MP3</div>
-              <div class="sound-card-desc" id="custom-sound-desc">Upload your sound</div>
-            </div>
+            <button type="button" class="sound-card active" data-profile="mechanical" aria-pressed="true">
+              <span class="sound-card-name">Mechanical</span>
+              <span class="sound-card-desc">Tactile Blue switch click</span>
+            </button>
+            <button type="button" class="sound-card" data-profile="thock" aria-pressed="false">
+              <span class="sound-card-name">Deep Thock</span>
+              <span class="sound-card-desc">Lubed Linear Red switch</span>
+            </button>
+            <button type="button" class="sound-card" data-profile="typewriter" aria-pressed="false">
+              <span class="sound-card-name">Typewriter</span>
+              <span class="sound-card-desc">Vintage metallic clack</span>
+            </button>
+            <button type="button" class="sound-card" data-profile="pop" aria-pressed="false">
+              <span class="sound-card-name">Bubble Pop</span>
+              <span class="sound-card-desc">Soft marimba drop</span>
+            </button>
+            <button type="button" class="sound-card" data-profile="beep" aria-pressed="false">
+              <span class="sound-card-name">Retro Beep</span>
+              <span class="sound-card-desc">8-bit arcade blip</span>
+            </button>
+            <button type="button" class="sound-card" data-profile="custom" aria-pressed="false">
+              <span class="sound-card-name">Custom MP3</span>
+              <span class="sound-card-desc" id="custom-sound-desc">Upload your sound</span>
+            </button>
           </div>
         </div>
 
@@ -542,7 +544,7 @@
           <div class="custom-audio-box">
             <input type="file" id="sound-file-input" accept="audio/*" style="display: none;">
             <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem;">
-              Upload your own keyboard click sound. Saved locally in browser.
+              Choose a file smaller than 3.5 MiB. Saved in this browser. Each key plays the first 0.25 seconds.
             </p>
             <div id="custom-file-status" class="hidden" style="margin-bottom: 0.4rem;">
               <span class="audio-file-badge">
@@ -561,7 +563,7 @@
           <h3>Volume</h3>
           <div class="volume-slider-wrapper">
             <span>🔈</span>
-            <input type="range" id="sound-volume-slider" class="volume-slider" min="0" max="100" value="80">
+            <input type="range" aria-label="Sound volume" id="sound-volume-slider" class="volume-slider" min="0" max="100" value="80">
             <span>🔊</span>
             <span id="volume-val-label" style="font-size: 0.85rem; font-weight: 700; width: 45px; text-align: right;">80%</span>
           </div>
@@ -590,13 +592,13 @@
       <div class="modal-body">
         <div class="custom-duration-box">
           <p style="color: var(--text-muted); font-size: 0.88rem;">
-            Enter the duration in seconds (e.g. <code>15</code>, <code>45</code>, <code>90</code>) or enter <code>inf</code> for unlimited practice:
+            Enter 1–3600 whole seconds (e.g. <code>15</code>, <code>45</code>, <code>90</code>) or enter <code>inf</code> for unlimited practice:
           </p>
 
           <div class="duration-input-group">
             <input
               type="text"
-              id="custom-duration-input"
+              aria-label="Duration in seconds, or inf" id="custom-duration-input"
               class="duration-input"
               placeholder="e.g. 45 or inf"
               autocomplete="off"

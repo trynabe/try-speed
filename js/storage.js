@@ -22,21 +22,45 @@ const DEFAULT_SETTINGS = {
   }
 };
 
+const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const nonnegative = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+const validDuration = value => value === 'inf' || (Number.isInteger(value) && value >= 1 && value <= 3600);
+const validDifficulty = value => ['easy', 'medium', 'hard'].includes(value);
+const validScore = value => isRecord(value) && nonnegative(value.wpm) && nonnegative(value.accuracy) && value.accuracy <= 100 && validDuration(value.duration) && validDifficulty(value.difficulty);
+
+function normalizeSettings(value) {
+  const data = isRecord(value) ? value : {};
+  const colors = isRecord(data.customColors) ? data.customColors : {};
+  const hex = color => typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color);
+  return {
+    duration: validDuration(data.duration) ? data.duration : DEFAULT_SETTINGS.duration,
+    difficulty: validDifficulty(data.difficulty) ? data.difficulty : DEFAULT_SETTINGS.difficulty,
+    theme: ['dark', 'light', 'matrix', 'dracula', 'cyberpunk', 'nord', 'monokai', 'catppuccin', 'custom'].includes(data.theme) ? data.theme : DEFAULT_SETTINGS.theme,
+    soundEnabled: typeof data.soundEnabled === 'boolean' ? data.soundEnabled : DEFAULT_SETTINGS.soundEnabled,
+    soundProfile: ['mechanical', 'thock', 'typewriter', 'pop', 'beep', 'custom'].includes(data.soundProfile) ? data.soundProfile : DEFAULT_SETTINGS.soundProfile,
+    soundVolume: nonnegative(data.soundVolume) && data.soundVolume <= 1 ? data.soundVolume : DEFAULT_SETTINGS.soundVolume,
+    customColors: {
+      accent: hex(colors.accent) ? colors.accent : DEFAULT_SETTINGS.customColors.accent,
+      bg: hex(colors.bg) ? colors.bg : DEFAULT_SETTINGS.customColors.bg
+    }
+  };
+}
+
 export const StorageManager = {
   getSettings() {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      return data ? { ...DEFAULT_SETTINGS, ...JSON.parse(data) } : { ...DEFAULT_SETTINGS };
+      return normalizeSettings(data ? JSON.parse(data) : null);
     } catch (e) {
       console.error('Failed to load settings:', e);
-      return { ...DEFAULT_SETTINGS };
+      return normalizeSettings(null);
     }
   },
 
   saveSettings(settings) {
     try {
       const current = this.getSettings();
-      const updated = { ...current, ...settings };
+      const updated = normalizeSettings({ ...current, ...settings });
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(updated));
       return updated;
     } catch (e) {
@@ -48,7 +72,9 @@ export const StorageManager = {
   getHistory() {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
-      return data ? JSON.parse(data) : [];
+      const history = data ? JSON.parse(data) : [];
+      return Array.isArray(history) ? history.filter(entry => validScore(entry) && nonnegative(entry.timestamp) &&
+        ['rawWpm', 'correctChars', 'incorrectChars', 'totalChars', 'timeSpent'].every(key => nonnegative(entry[key]))).slice(0, 100) : [];
     } catch (e) {
       console.error('Failed to load history:', e);
       return [];
@@ -68,7 +94,7 @@ export const StorageManager = {
         incorrectChars: session.incorrectChars,
         totalChars: session.totalChars,
         duration: session.duration,
-        timeSpent: Math.round(session.timeSpent),
+        timeSpent: session.timeSpent,
         difficulty: session.difficulty
       };
 
@@ -106,7 +132,8 @@ export const StorageManager = {
       }
 
       // Also track overall best
-      if (!bestScores.overall || entry.wpm > bestScores.overall.wpm) {
+      if (!bestScores.overall || entry.wpm > bestScores.overall.wpm ||
+          (entry.wpm === bestScores.overall.wpm && entry.accuracy > bestScores.overall.accuracy)) {
         bestScores.overall = {
           wpm: entry.wpm,
           accuracy: entry.accuracy,
@@ -125,7 +152,9 @@ export const StorageManager = {
   getAllBestScores() {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.BEST_SCORES);
-      return data ? JSON.parse(data) : {};
+      const scores = data ? JSON.parse(data) : {};
+      return isRecord(scores) ? Object.fromEntries(Object.entries(scores).filter(([key, value]) =>
+        (key === 'overall' || /^(easy|medium|hard)_(inf|\d+)$/.test(key)) && validScore(value))) : {};
     } catch (e) {
       console.error('Failed to load best scores:', e);
       return {};

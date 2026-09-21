@@ -233,6 +233,19 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+.hidden, [hidden] {
+  display: none !important;
+}
+
+body.modal-open { overflow: hidden; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+button:disabled { opacity: 0.5; cursor: default; }
+
 body {
   background-color: var(--bg-primary);
   color: var(--text-main);

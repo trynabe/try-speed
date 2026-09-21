@@ -5,6 +5,7 @@
  */
 
 const STORAGE_KEYS = {
+  CUSTOM_AUDIO: 'tryspeed_custom_audio',
   CUSTOM_AUDIO_DATA: 'tryspeed_custom_audio_data',
   CUSTOM_AUDIO_NAME: 'tryspeed_custom_audio_name'
 };
@@ -16,54 +17,63 @@ export const SoundEffects = (() => {
   let volume = 0.8; // 0.0 to 1.0
   let customAudioBuffer = null;
   let customAudioName = '';
+  let outputGain = null;
+  let previewGain = null;
+  const activeSources = new Set();
+  const MAX_AUDIO_BYTES = 3.5 * 1024 * 1024;
 
-  function getContext() {
+  function getContext(resume = false) {
     if (!audioCtx && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       audioCtx = new AudioContextClass();
+      outputGain = audioCtx.createGain();
+      previewGain = audioCtx.createGain();
+      outputGain.connect(audioCtx.destination);
+      previewGain.connect(audioCtx.destination);
+      outputGain.gain.setValueAtTime(isMuted ? 0 : volume, audioCtx.currentTime);
+      previewGain.gain.setValueAtTime(volume, audioCtx.currentTime);
     }
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume();
+    if (resume && audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
     }
     return audioCtx;
   }
 
   // Load custom audio saved from previous sessions
-  function initStoredCustomAudio() {
+  async function initStoredCustomAudio() {
     try {
-      const storedData = localStorage.getItem(STORAGE_KEYS.CUSTOM_AUDIO_DATA);
-      const storedName = localStorage.getItem(STORAGE_KEYS.CUSTOM_AUDIO_NAME);
+      const record = localStorage.getItem(STORAGE_KEYS.CUSTOM_AUDIO);
+      const saved = record ? JSON.parse(record) : null;
+      const storedData = saved?.data || localStorage.getItem(STORAGE_KEYS.CUSTOM_AUDIO_DATA);
+      const storedName = saved?.name || localStorage.getItem(STORAGE_KEYS.CUSTOM_AUDIO_NAME);
       if (storedData && storedName) {
-        loadCustomAudioFromBase64(storedData, storedName, false);
+        await loadCustomAudioFromBase64(storedData, storedName, false);
       }
     } catch (e) {
       console.warn('Failed to load stored custom audio:', e);
     }
   }
 
-  // Auto-init on script load if window exists
-  if (typeof window !== 'undefined') {
-    setTimeout(initStoredCustomAudio, 100);
-  }
+  // Consumers await this before rendering the restored filename or replacing it.
+  const ready = typeof window !== 'undefined' ? initStoredCustomAudio() : Promise.resolve();
 
   /**
    * Convert File or Blob to ArrayBuffer and decode for playback
    */
   async function loadCustomAudioFile(file) {
+    await ready;
+    if (file.size >= MAX_AUDIO_BYTES) throw new Error('Choose an audio file smaller than 3.5 MiB. Your previous sound is unchanged.');
     const ctx = getContext();
     if (!ctx) throw new Error('Web Audio not supported');
 
     const arrayBuffer = await file.arrayBuffer();
+    if (arrayBuffer.byteLength >= MAX_AUDIO_BYTES) throw new Error('Choose an audio file smaller than 3.5 MiB. Your previous sound is unchanged.');
     // Clone arrayBuffer because decodeAudioData detaches it
     const bufferCopy = arrayBuffer.slice(0);
 
     const decoded = await ctx.decodeAudioData(arrayBuffer);
-    customAudioBuffer = decoded;
-    customAudioName = file.name;
-
-    // Save as Base64 in LocalStorage for persistence across reloads (if < 3.5MB)
-    if (bufferCopy.byteLength < 3.5 * 1024 * 1024) {
-      try {
+    // Store name and data atomically before replacing the currently active sound.
+    try {
         let binary = '';
         const bytes = new Uint8Array(bufferCopy);
         const len = bytes.byteLength;
@@ -71,13 +81,17 @@ export const SoundEffects = (() => {
           binary += String.fromCharCode(bytes[i]);
         }
         const base64 = btoa(binary);
-        localStorage.setItem(STORAGE_KEYS.CUSTOM_AUDIO_DATA, base64);
-        localStorage.setItem(STORAGE_KEYS.CUSTOM_AUDIO_NAME, file.name);
-      } catch (e) {
-        console.warn('File too large for LocalStorage caching:', e);
-      }
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_AUDIO, JSON.stringify({ name: file.name, data: base64 }));
+    } catch (e) {
+      throw new Error('The sound could not be saved. Browser storage may be full or unavailable. Choose a smaller file. Your previous sound is unchanged.');
     }
-
+    try {
+      localStorage.removeItem(STORAGE_KEYS.CUSTOM_AUDIO_DATA);
+      localStorage.removeItem(STORAGE_KEYS.CUSTOM_AUDIO_NAME);
+    } catch (e) { /* The new atomic record takes precedence over legacy storage. */ }
+    stopCustomSounds();
+    customAudioBuffer = decoded;
+    customAudioName = file.name;
     activeProfile = 'custom';
     return { name: file.name, duration: decoded.duration };
   }
@@ -102,13 +116,23 @@ export const SoundEffects = (() => {
   }
 
   function clearCustomAudio() {
-    customAudioBuffer = null;
-    customAudioName = '';
     localStorage.removeItem(STORAGE_KEYS.CUSTOM_AUDIO_DATA);
     localStorage.removeItem(STORAGE_KEYS.CUSTOM_AUDIO_NAME);
+    localStorage.removeItem(STORAGE_KEYS.CUSTOM_AUDIO);
+    stopCustomSounds();
+    customAudioBuffer = null;
+    customAudioName = '';
     if (activeProfile === 'custom') {
       activeProfile = 'mechanical';
     }
+  }
+
+  function stopCustomSounds() {
+    activeSources.forEach(source => {
+      try { source.stop(); } catch (e) { /* Already ended. */ }
+      source.disconnect();
+    });
+    activeSources.clear();
   }
 
   /**
@@ -230,9 +254,17 @@ export const SoundEffects = (() => {
       return;
     }
     const source = ctx.createBufferSource();
+    if (activeSources.size >= 16) {
+      const oldest = activeSources.values().next().value;
+      oldest.stop();
+      oldest.disconnect();
+      activeSources.delete(oldest);
+    }
     source.buffer = customAudioBuffer;
     source.connect(masterGain);
-    source.start(0);
+    activeSources.add(source);
+    source.onended = () => { activeSources.delete(source); source.disconnect(); };
+    source.start(ctx.currentTime, 0, Math.min(customAudioBuffer.duration, 0.25));
   }
 
   // Low error thud
@@ -253,16 +285,15 @@ export const SoundEffects = (() => {
     osc.stop(now + 0.085);
   }
 
-  function playKeyClick(isError = false) {
-    if (isMuted) return;
+  function playKeyClick(isError = false, preview = false) {
+    if (isMuted && !preview) return;
     try {
-      const ctx = getContext();
+      const ctx = getContext(true);
       if (!ctx) return;
 
       const now = ctx.currentTime;
-      const masterGain = ctx.createGain();
-      masterGain.gain.setValueAtTime(Math.max(0, Math.min(1, volume)), now);
-      masterGain.connect(ctx.destination);
+      const masterGain = preview ? previewGain : outputGain;
+      if (preview) previewGain.gain.setValueAtTime(volume, now);
 
       if (isError) {
         playErrorSound(ctx, now, masterGain);
@@ -298,7 +329,7 @@ export const SoundEffects = (() => {
   function playFinishChime() {
     if (isMuted) return;
     try {
-      const ctx = getContext();
+      const ctx = getContext(true);
       if (!ctx) return;
 
       const now = ctx.currentTime;
@@ -309,11 +340,11 @@ export const SoundEffects = (() => {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(freq, now + i * 0.08);
 
-        gain.gain.setValueAtTime(0.15 * volume, now + i * 0.08);
+        gain.gain.setValueAtTime(0.15, now + i * 0.08);
         gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.3);
 
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(outputGain);
 
         osc.start(now + i * 0.08);
         osc.stop(now + i * 0.08 + 0.35);
@@ -322,20 +353,30 @@ export const SoundEffects = (() => {
   }
 
   return {
+    ready,
     setMuted(muted) {
-      isMuted = muted;
+      isMuted = Boolean(muted);
+      if (audioCtx) {
+        outputGain.gain.setValueAtTime(isMuted ? 0 : volume, audioCtx.currentTime);
+        previewGain.gain.setValueAtTime(isMuted ? 0 : volume, audioCtx.currentTime);
+      }
+      if (isMuted) stopCustomSounds();
     },
     isMuted() {
       return isMuted;
     },
     setVolume(val) {
-      volume = Math.max(0, Math.min(1, Number(val)));
+      volume = Number.isFinite(Number(val)) ? Math.max(0, Math.min(1, Number(val))) : 0.8;
+      if (audioCtx) {
+        outputGain.gain.setValueAtTime(isMuted ? 0 : volume, audioCtx.currentTime);
+        previewGain.gain.setValueAtTime(volume, audioCtx.currentTime);
+      }
     },
     getVolume() {
       return volume;
     },
     setProfile(profile) {
-      activeProfile = profile;
+      activeProfile = ['mechanical', 'thock', 'typewriter', 'pop', 'beep', 'custom'].includes(profile) ? profile : 'mechanical';
     },
     getProfile() {
       return activeProfile;

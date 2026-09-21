@@ -23,6 +23,24 @@ export class UIController {
     this.themeModal = document.getElementById('theme-modal');
     this.customDurModal = document.getElementById('custom-duration-modal');
     this.soundModal = document.getElementById('sound-modal');
+    this.modals = [this.resultsModal, this.historyModal, this.instructionsModal, this.themeModal, this.customDurModal, this.soundModal].filter(Boolean);
+    this.appWrapper = document.querySelector('.app-wrapper');
+    this.modals.forEach(modal => {
+      modal.tabIndex = -1;
+      modal.addEventListener('keydown', e => {
+        if (e.key !== 'Tab') return;
+        const controls = [...modal.querySelectorAll('button:not(:disabled), input:not(:disabled):not([type="file"]), [tabindex="0"]')]
+          .filter(el => el.getClientRects().length > 0);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (!first) { e.preventDefault(); modal.focus(); return; }
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === modal)) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || document.activeElement === modal)) {
+          e.preventDefault(); first.focus();
+        }
+      });
+    });
 
     // Controls
     this.themeBtn = document.getElementById('theme-btn');
@@ -30,6 +48,7 @@ export class UIController {
     this.customDurationPill = document.getElementById('custom-duration-pill');
     this.restartBtn = document.getElementById('restart-btn');
     this.newTextBtn = document.getElementById('new-text-btn');
+    this.finishBtn = document.getElementById('finish-btn');
 
     // Caret element
     this.caret = null;
@@ -39,6 +58,7 @@ export class UIController {
     this.isSpaceFlags = [];
     this.appliedClasses = [];
     this.charPos = [];
+    this.prevIndex = null;
     this.linePitch = 0;
     this.scrollTopCache = 0;
     this._blinkTimer = null;
@@ -49,7 +69,10 @@ export class UIController {
     });
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
-        if (this.charElements.length) this.measurePositions();
+        if (this.charElements.length) {
+          this.measurePositions();
+          this.updateCaretPosition(this.caretIndex || 0);
+        }
       });
     }
   }
@@ -60,6 +83,7 @@ export class UIController {
     this.charElements = [];
     this.isSpaceFlags = [];
     this.appliedClasses = [];
+    this.prevIndex = null;
 
     // Build off-document: one reflow instead of one per appended node
     const frag = document.createDocumentFragment();
@@ -134,8 +158,19 @@ export class UIController {
 
   updateCharacterStates(charStates, currentIndex) {
     const n = this.charElements.length;
+    if (n === 0) return;
 
-    for (let i = 0; i < n; i++) {
+    let start = 0;
+    let end = n - 1;
+
+    // Narrow scan range when progressing incrementally to prevent typing lag in long/inf sessions
+    if (this.prevIndex !== null && typeof this.prevIndex === 'number') {
+      start = Math.max(0, Math.min(this.prevIndex, currentIndex) - 2);
+      end = Math.min(n - 1, Math.max(this.prevIndex, currentIndex) + 2);
+    }
+    this.prevIndex = currentIndex;
+
+    for (let i = start; i <= end; i++) {
       const stateObj = charStates[i];
       if (!stateObj) continue;
 
@@ -160,6 +195,7 @@ export class UIController {
   }
 
   updateCaretPosition(index) {
+    this.caretIndex = index;
     if (!this.caret || !this.textDisplay) return;
     if (!this.charPos || this.charPos.length === 0) return;
 
@@ -258,7 +294,7 @@ export class UIController {
     document.getElementById('res-accuracy').textContent = `${sessionData.accuracy}%`;
     document.getElementById('res-correct').textContent = sessionData.correctChars;
     document.getElementById('res-incorrect').textContent = sessionData.incorrectChars;
-    document.getElementById('res-time').textContent = `${sessionData.timeSpent}s`;
+    document.getElementById('res-time').textContent = `${Number(sessionData.timeSpent.toFixed(2))}s`;
 
     const errorRateEl = document.getElementById('res-error-rate');
     if (errorRateEl) {
@@ -295,13 +331,11 @@ export class UIController {
       }
     }
 
-    this.resultsModal.classList.remove('hidden');
+    this.openModal(this.resultsModal);
   }
 
   hideResultsModal() {
-    if (this.resultsModal) {
-      this.resultsModal.classList.add('hidden');
-    }
+    this.closeModal(this.resultsModal);
   }
 
   renderHistory(historyList, statsSummary) {
@@ -321,67 +355,101 @@ export class UIController {
     if (!listEl) return;
 
     if (!historyList || historyList.length === 0) {
-      listEl.innerHTML = '<div class="empty-history">No typing sessions recorded yet. Complete a session to see your progress!</div>';
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty-history';
+      emptyDiv.textContent = 'No typing sessions recorded yet. Complete a session to see your progress!';
+      listEl.innerHTML = '';
+      listEl.appendChild(emptyDiv);
       return;
     }
 
-    listEl.innerHTML = historyList.map(item => {
+    const items = historyList.map(item => {
       const dateStr = new Date(item.timestamp).toLocaleDateString(undefined, {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       });
-      return `
-        <div class="history-item">
-          <div class="hist-col-main">
-            <span class="hist-wpm">${item.wpm} <small>WPM</small></span>
-            <span class="hist-acc">${item.accuracy}% acc</span>
-          </div>
-          <div class="hist-col-details">
-            <span class="hist-mode">${item.duration}s • ${item.difficulty}</span>
-            <span class="hist-chars">${item.correctChars}✓ / ${item.incorrectChars}✗</span>
-          </div>
-          <div class="hist-col-date">${dateStr}</div>
-        </div>
-      `;
-    }).join('');
+
+      const itemEl = document.createElement('div');
+      itemEl.className = 'history-item';
+
+      const colMain = document.createElement('div');
+      colMain.className = 'hist-col-main';
+
+      const wpmSpan = document.createElement('span');
+      wpmSpan.className = 'hist-wpm';
+      wpmSpan.textContent = `${item.wpm} `;
+      const smallWpm = document.createElement('small');
+      smallWpm.textContent = 'WPM';
+      wpmSpan.appendChild(smallWpm);
+
+      const accSpan = document.createElement('span');
+      accSpan.className = 'hist-acc';
+      accSpan.textContent = `${item.accuracy}% acc`;
+
+      colMain.append(wpmSpan, accSpan);
+
+      const colDetails = document.createElement('div');
+      colDetails.className = 'hist-col-details';
+
+      const modeSpan = document.createElement('span');
+      modeSpan.className = 'hist-mode';
+      modeSpan.textContent = `${item.duration === 'inf' ? '∞ Zen' : `${item.duration}s`} • ${item.difficulty}`;
+
+      const charsSpan = document.createElement('span');
+      charsSpan.className = 'hist-chars';
+      charsSpan.textContent = `${item.correctChars}✓ / ${item.incorrectChars}✗`;
+
+      colDetails.append(modeSpan, charsSpan);
+
+      const colDate = document.createElement('div');
+      colDate.className = 'hist-col-date';
+      colDate.textContent = dateStr;
+
+      itemEl.append(colMain, colDetails, colDate);
+      return itemEl;
+    });
+
+    listEl.innerHTML = '';
+    listEl.append(...items);
   }
 
   openHistoryModal() {
-    if (this.historyModal) this.historyModal.classList.remove('hidden');
+    this.openModal(this.historyModal);
   }
 
   closeHistoryModal() {
-    if (this.historyModal) this.historyModal.classList.add('hidden');
+    this.closeModal(this.historyModal);
   }
 
   openInstructionsModal() {
-    if (this.instructionsModal) this.instructionsModal.classList.remove('hidden');
+    this.openModal(this.instructionsModal);
   }
 
   closeInstructionsModal() {
-    if (this.instructionsModal) this.instructionsModal.classList.add('hidden');
+    this.closeModal(this.instructionsModal);
   }
 
   openThemeModal() {
-    if (this.themeModal) this.themeModal.classList.remove('hidden');
+    this.openModal(this.themeModal);
   }
 
   closeThemeModal() {
-    if (this.themeModal) this.themeModal.classList.add('hidden');
+    this.closeModal(this.themeModal);
   }
 
   openCustomDurModal() {
-    if (this.customDurModal) this.customDurModal.classList.remove('hidden');
+    this.openModal(this.customDurModal, document.getElementById('custom-duration-input'));
   }
 
   closeCustomDurModal() {
-    if (this.customDurModal) this.customDurModal.classList.add('hidden');
+    this.closeModal(this.customDurModal);
   }
 
   updateCustomDurationPill(duration) {
     if (!this.customDurationPill) return;
+    this.customDurationPill.setAttribute('aria-checked', String(![30, 60, 120].includes(Number(duration))));
     if (duration === 'inf' || duration === Infinity) {
       this.customDurationPill.textContent = '∞ inf';
       this.customDurationPill.classList.add('active');
@@ -400,6 +468,7 @@ export class UIController {
     // Update active state on preset cards
     document.querySelectorAll('.theme-card').forEach(card => {
       card.classList.toggle('active', card.dataset.themeName === themeName);
+      card.setAttribute('aria-pressed', String(card.dataset.themeName === themeName));
     });
 
     if (themeName === 'custom' && customColors) {
@@ -408,10 +477,22 @@ export class UIController {
       document.documentElement.style.setProperty('--accent-hover', customColors.accent);
       document.documentElement.style.setProperty('--accent-light', customColors.accent + '26');
       document.documentElement.style.setProperty('--bg-primary', customColors.bg);
-      document.documentElement.style.setProperty('--bg-secondary', this.adjustColor(customColors.bg, 14));
-      document.documentElement.style.setProperty('--bg-tertiary', this.adjustColor(customColors.bg, 24));
+      const rgb = customColors.bg.slice(1).match(/../g).map(value => {
+        const channel = parseInt(value, 16) / 255;
+        return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+      });
+      const light = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722 > 0.179;
+      const surface = this.adjustColor(customColors.bg, light ? 14 : -14);
+      const style = document.documentElement.style;
+      style.setProperty('--bg-secondary', surface);
+      style.setProperty('--bg-tertiary', this.adjustColor(customColors.bg, light ? 24 : -24));
+      style.setProperty('--bg-surface', surface + 'ed');
+      style.setProperty('--text-main', light ? '#000000' : '#ffffff');
+      style.setProperty('--text-muted', light ? '#202020' : '#ededed');
+      style.setProperty('--text-dim', light ? '#303030' : '#dddddd');
+      style.setProperty('--border-subtle', light ? '#767676' : '#909090');
     } else {
-      ['--accent', '--caret-color', '--accent-hover', '--accent-light', '--bg-primary', '--bg-secondary', '--bg-tertiary'].forEach(prop => {
+      ['--accent', '--caret-color', '--accent-hover', '--accent-light', '--bg-primary', '--bg-secondary', '--bg-tertiary', '--bg-surface', '--text-main', '--text-muted', '--text-dim', '--border-subtle'].forEach(prop => {
         document.documentElement.style.removeProperty(prop);
       });
     }
@@ -430,16 +511,17 @@ export class UIController {
   }
 
   openSoundModal() {
-    if (this.soundModal) this.soundModal.classList.remove('hidden');
+    this.openModal(this.soundModal);
   }
 
   closeSoundModal() {
-    if (this.soundModal) this.soundModal.classList.add('hidden');
+    this.closeModal(this.soundModal);
   }
 
   updateSoundProfileUI(activeProfile, customName = '') {
     document.querySelectorAll('.sound-card').forEach(card => {
       card.classList.toggle('active', card.dataset.profile === activeProfile);
+      card.setAttribute('aria-pressed', String(card.dataset.profile === activeProfile));
     });
 
     const customDesc = document.getElementById('custom-sound-desc');
@@ -478,5 +560,36 @@ export class UIController {
       modalToggleBtn.textContent = isEnabled ? 'Active (ON)' : 'Muted (OFF)';
       modalToggleBtn.className = isEnabled ? 'btn btn-primary' : 'btn btn-secondary';
     }
+  }
+
+  getOpenModal() {
+    return this.modals.find(modal => !modal.classList.contains('hidden')) || null;
+  }
+
+  openModal(modal, initialFocus) {
+    if (!modal || this.getOpenModal() === modal) return;
+    const previous = this.getOpenModal();
+    if (previous) previous.classList.add('hidden');
+    else this.returnFocus = document.activeElement;
+    modal.classList.remove('hidden');
+    document.body.classList.add('modal-open');
+    (initialFocus || modal.querySelector('button:not(:disabled), input:not([type="file"])') || modal).focus();
+    if (this.appWrapper) this.appWrapper.inert = true;
+  }
+
+  closeModal(modal) {
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    if (!this.getOpenModal()) {
+      if (this.appWrapper) this.appWrapper.inert = false;
+      document.body.classList.remove('modal-open');
+      if (this.returnFocus?.isConnected && !this.returnFocus.disabled) this.returnFocus.focus();
+    }
+  }
+
+  setFinishEnabled(enabled, show) {
+    if (!this.finishBtn) return;
+    this.finishBtn.disabled = !enabled;
+    if (show !== undefined) this.finishBtn.classList.toggle('hidden', !show);
   }
 }

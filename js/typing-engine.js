@@ -4,7 +4,7 @@
  */
 
 export class TypingEngine {
-  constructor({ onStateChange, onMetricsChange, onFirstKeystroke, onComplete, onSound } = {}) {
+  constructor({ onStateChange, onMetricsChange, onFirstKeystroke, onComplete, onSound, beforeInput, onTextExhausted } = {}) {
     this.targetText = '';
     this.charStates = []; // Array of { char: string, state: 'pending'|'correct'|'incorrect'|'extra' }
     this.currentIndex = 0;
@@ -24,6 +24,8 @@ export class TypingEngine {
     this.onFirstKeystroke = onFirstKeystroke || (() => {});
     this.onComplete = onComplete || (() => {});
     this.onSound = onSound || (() => {});
+    this.beforeInput = beforeInput || (() => true);
+    this.onTextExhausted = onTextExhausted || (() => {});
   }
 
   setText(text) {
@@ -50,7 +52,7 @@ export class TypingEngine {
   }
 
   handleInput(key, ctrlKey = false) {
-    if (this.isCompleted) return;
+    if (this.isCompleted || !this.beforeInput()) return;
 
     // Handle Backspace
     if (key === 'Backspace') {
@@ -59,7 +61,7 @@ export class TypingEngine {
     }
 
     // Ignore non-printable modifier keys
-    if (key.length > 1) return;
+    if (typeof key !== 'string' || key.length !== 1) return;
 
     // First keypress triggers the timer
     if (!this.hasStarted) {
@@ -87,6 +89,8 @@ export class TypingEngine {
 
     this.currentIndex++;
 
+    // Infinite sessions may append another chunk without resetting counters.
+    if (this.currentIndex >= this.charStates.length) this.onTextExhausted();
     // Check if test is completed
     if (this.currentIndex >= this.charStates.length) {
       this.isCompleted = true;
@@ -99,7 +103,7 @@ export class TypingEngine {
   }
 
   handleBackspace(ctrlKey = false) {
-    if (this.currentIndex === 0) return;
+    if (this.isCompleted || this.currentIndex === 0) return;
 
     if (ctrlKey) {
       // Delete whole word back
@@ -137,7 +141,7 @@ export class TypingEngine {
       else pendingChars++;
     }
 
-    const effectiveTimeMin = Math.max(0.016, this.elapsedSeconds / 60); // min ~1 sec to avoid divide by zero
+    const effectiveTimeMin = Math.max(Number.EPSILON, this.elapsedSeconds / 60);
 
     // Standard Gross WPM: (all typed characters / 5) / time in min
     const grossWpm = this.elapsedSeconds > 0
@@ -176,5 +180,17 @@ export class TypingEngine {
 
   reset() {
     this.setText(this.targetText);
+  }
+
+  appendText(text) {
+    if (this.isCompleted) return;
+    this.targetText += text;
+    this.charStates.push(...text.split('').map(char => ({ char, state: 'pending' })));
+  }
+
+  finish(seconds) {
+    this.isCompleted = true;
+    this.setElapsedSeconds(seconds);
+    this.onStateChange(this.getMetrics());
   }
 }

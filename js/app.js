@@ -10,11 +10,13 @@ import { SoundEffects } from './audio.js';
 import { TypingEngine } from './typing-engine.js';
 import { UIController } from './ui.js';
 
-class TypingApp {
-  constructor() {
-    this.ui = new UIController();
+export class TypingApp {
+  constructor({ ui = new UIController(), now } = {}) {
+    this.ui = ui;
     this.settings = StorageManager.getSettings();
     this.currentText = '';
+    this.sessionFinished = false;
+    this.isComposing = false;
 
     // Initialize Audio Engine
     SoundEffects.setMuted(!this.settings.soundEnabled);
@@ -24,12 +26,16 @@ class TypingApp {
     this.ui.setSoundState(this.settings.soundEnabled);
     this.ui.updateSoundVolumeUI(this.settings.soundVolume ?? 0.8);
     this.ui.updateSoundProfileUI(this.settings.soundProfile || 'mechanical', SoundEffects.getCustomAudioName());
+    SoundEffects.ready.then(() => {
+      this.ui.updateSoundProfileUI(this.settings.soundProfile, SoundEffects.getCustomAudioName());
+    });
 
     // Initialize Theme & Custom Colors
     this.ui.setTheme(this.settings.theme || 'dark', this.settings.customColors);
 
     // Initialize Timer
     this.timer = new Timer(this.settings.duration, {
+      now,
       onTick: (remainingOrMode, elapsedSeconds) => {
         this.ui.updateTimer(remainingOrMode, elapsedSeconds);
         this.typingEngine.setElapsedSeconds(elapsedSeconds);
@@ -41,6 +47,12 @@ class TypingApp {
 
     // Initialize Typing Engine
     this.typingEngine = new TypingEngine({
+      beforeInput: () => this.canType(),
+      onTextExhausted: () => {
+        if (this.settings.duration !== 'inf') return;
+        this.typingEngine.appendText(' ' + TextGenerator.generateText(this.settings.difficulty, 'inf'));
+        this.ui.renderText(this.typingEngine.targetText);
+      },
       onStateChange: (metrics) => {
         this.ui.updateCharacterStates(this.typingEngine.charStates, metrics.currentIndex);
         this.ui.updateLiveMetrics(metrics);
@@ -50,6 +62,7 @@ class TypingApp {
       },
       onFirstKeystroke: () => {
         this.timer.start();
+        this.ui.setFinishEnabled(true);
       },
       onComplete: () => {
         const elapsed = this.timer.getElapsedSeconds();
@@ -76,6 +89,19 @@ class TypingApp {
     if (input) {
       input.addEventListener('keydown', (e) => this.handleKeyDown(e));
       input.addEventListener('input', (e) => this.handleMobileInput(e));
+      input.addEventListener('compositionstart', () => {
+        this.isComposing = true;
+        this.compositionCommit = null;
+      });
+      input.addEventListener('compositionend', (e) => {
+        this.isComposing = false;
+        this.commitText(e.data || '');
+        // Some browsers emit one final input immediately after compositionend.
+        this.compositionCommit = e.data;
+        clearTimeout(this.compositionCommitTimer);
+        this.compositionCommitTimer = setTimeout(() => { this.compositionCommit = null; }, 0);
+        this.resetInput();
+      });
       input.addEventListener('focus', () => this.ui.showFocusOverlay(false));
       input.addEventListener('blur', () => {
         // Only show overlay if all modals are closed
@@ -118,6 +144,7 @@ class TypingApp {
         const inputEl = document.getElementById('custom-duration-input');
         if (inputEl) {
           inputEl.value = this.settings.duration === 'inf' ? 'inf' : this.settings.duration;
+          inputEl.setCustomValidity('');
         }
         this.ui.openCustomDurModal();
       });
@@ -163,9 +190,11 @@ class TypingApp {
       customDurInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
+          e.stopPropagation();
           this.applyCustomDurationFromModal();
         }
       });
+      customDurInput.addEventListener('input', () => customDurInput.setCustomValidity(''));
     }
 
     // Difficulty options
@@ -177,6 +206,20 @@ class TypingApp {
       });
     });
 
+    document.querySelectorAll('[role="radiogroup"]').forEach(group => {
+      group.addEventListener('keydown', e => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+        const choices = [...group.querySelectorAll('[role="radio"]')];
+        const index = choices.indexOf(document.activeElement);
+        if (index < 0) return;
+        e.preventDefault();
+        const offset = ['ArrowLeft', 'ArrowUp'].includes(e.key) ? -1 : 1;
+        const next = e.key === 'Home' ? 0 : e.key === 'End' ? choices.length - 1 : (index + offset + choices.length) % choices.length;
+        choices[next].click();
+        if (!this.ui.getOpenModal()) choices[next].focus();
+      });
+    });
+
     // Control buttons
     if (this.ui.restartBtn) {
       this.ui.restartBtn.addEventListener('click', () => this.restartCurrentText());
@@ -184,6 +227,9 @@ class TypingApp {
     if (this.ui.newTextBtn) {
       this.ui.newTextBtn.addEventListener('click', () => this.loadNewText());
     }
+    document.getElementById('finish-btn')?.addEventListener('click', () => {
+      this.finishSession(this.timer.getElapsedSeconds());
+    });
 
     // History Modal buttons
     const historyBtn = document.getElementById('history-btn');
@@ -249,6 +295,7 @@ class TypingApp {
 
     // Global keyboard navigation shortcuts
     window.addEventListener('keydown', (e) => {
+      if (e.isComposing || this.isComposing) return;
       // Escape closes modals or resets test
       if (e.key === 'Escape') {
         if (this.ui.resultsModal && !this.ui.resultsModal.classList.contains('hidden')) {
@@ -285,24 +332,17 @@ class TypingApp {
         return;
       }
 
-      // Tab key tracking for Tab + Enter restart shortcut
-      if (e.key === 'Tab') {
-        this.lastTabTime = Date.now();
-      }
-
-      // Tab + Enter or Ctrl + Enter restart shortcut
-      if (e.key === 'Enter') {
-        const isTabEnter = this.lastTabTime && (Date.now() - this.lastTabTime < 900);
-        const isCtrlEnter = e.ctrlKey || e.metaKey;
-        if (isTabEnter || isCtrlEnter) {
-          e.preventDefault();
-          this.restartCurrentText();
-          return;
-        }
+      // Tab + Enter uses native navigation from the arena to Restart.
+      const modal = this.ui.getOpenModal();
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (!modal || modal === this.ui.resultsModal)) {
+        e.preventDefault();
+        this.restartCurrentText();
+        return;
       }
 
       // Any keypress when not inside a modal focuses hidden input
       if (
+        !modal &&
         document.activeElement !== this.ui.hiddenInput &&
         !['INPUT', 'BUTTON', 'TEXTAREA'].includes(document.activeElement?.tagName)
       ) {
@@ -369,10 +409,7 @@ class TypingApp {
         this.ui.updateSoundProfileUI(profile, SoundEffects.getCustomAudioName());
 
         // Play feedback sample
-        const wasMuted = SoundEffects.isMuted();
-        SoundEffects.setMuted(false);
-        SoundEffects.playKeyClick(false);
-        SoundEffects.setMuted(wasMuted);
+        SoundEffects.playKeyClick(false, true);
       });
     });
 
@@ -392,10 +429,7 @@ class TypingApp {
     const testSoundBtn = document.getElementById('test-sound-btn');
     if (testSoundBtn) {
       testSoundBtn.addEventListener('click', () => {
-        const wasMuted = SoundEffects.isMuted();
-        SoundEffects.setMuted(false);
-        SoundEffects.playKeyClick(false);
-        SoundEffects.setMuted(wasMuted);
+        SoundEffects.playKeyClick(false, true);
       });
     }
 
@@ -419,13 +453,12 @@ class TypingApp {
           this.ui.updateSoundProfileUI('custom', info.name);
 
           // Play preview
-          const wasMuted = SoundEffects.isMuted();
-          SoundEffects.setMuted(false);
-          SoundEffects.playKeyClick(false);
-          SoundEffects.setMuted(wasMuted);
+          SoundEffects.playKeyClick(false, true);
         } catch (err) {
-          alert('Could not decode audio file. Please try another MP3 or WAV audio file.');
+          alert(err.message || 'Could not decode audio file. Please choose another audio file.');
           console.error(err);
+        } finally {
+          fileInput.value = '';
         }
       });
     }
@@ -435,7 +468,12 @@ class TypingApp {
     if (clearCustomBtn) {
       clearCustomBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        SoundEffects.clearCustomAudio();
+        try {
+          SoundEffects.clearCustomAudio();
+        } catch (err) {
+          alert('Could not remove the saved sound. Browser storage is unavailable.');
+          return;
+        }
         this.settings.soundProfile = 'mechanical';
         StorageManager.saveSettings({ soundProfile: 'mechanical' });
         this.ui.updateSoundProfileUI('mechanical', '');
@@ -529,12 +567,14 @@ class TypingApp {
     if (rawVal === 'inf' || rawVal === 'infinity' || rawVal === '∞') {
       this.setDuration('inf');
     } else {
-      const parsed = parseInt(rawVal, 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        this.setDuration(Math.min(3600, parsed));
-      } else {
-        this.setDuration(60);
+      const parsed = Number(rawVal);
+      if (!/^\d+$/.test(rawVal) || !Number.isInteger(parsed) || parsed < 1 || parsed > 3600) {
+        inputEl.setCustomValidity('Enter a whole number from 1 to 3600, or inf.');
+        inputEl.reportValidity();
+        return;
       }
+      inputEl.setCustomValidity('');
+      this.setDuration(parsed);
     }
 
     this.ui.closeCustomDurModal();
@@ -542,6 +582,8 @@ class TypingApp {
   }
 
   handleKeyDown(e) {
+    if (e.isComposing || this.isComposing || e.keyCode === 229) return;
+    this.compositionCommit = null;
     // Allow browser shortcuts (like Ctrl+C, Ctrl+R, F5, F12)
     if (e.ctrlKey || e.metaKey || e.altKey) {
       if (e.key === 'Backspace') {
@@ -561,40 +603,53 @@ class TypingApp {
       return; // allow normal tab navigation
     }
 
-    if (e.key.length === 1) {
-      e.preventDefault();
-      this.lastInputTime = Date.now();
-      this.lastKey = e.key;
-      this.typingEngine.handleInput(e.key);
-    }
+    // Printable characters use the input event on both desktop and mobile.
   }
 
   handleMobileInput(e) {
-    // Avoid double processing if keydown already handled this character
-    const now = Date.now();
-    if (this.lastInputTime && (now - this.lastInputTime < 40)) {
-      if (this.ui.hiddenInput) {
-        this.ui.hiddenInput.value = '';
-      }
+    if (e.isComposing || this.isComposing) return;
+    if (this.compositionCommit != null && e.data === this.compositionCommit) {
+      this.compositionCommit = null;
+      this.resetInput();
       return;
     }
-
-    // For mobile virtual keyboards that fire input events
-    if (e.inputType === 'deleteContentBackward') {
-      this.typingEngine.handleInput('Backspace', false);
-    } else if (e.data) {
-      for (const char of e.data) {
-        this.typingEngine.handleInput(char);
-      }
+    this.compositionCommit = null;
+    if (e.inputType?.startsWith('delete')) {
+      this.typingEngine.handleInput('Backspace', e.inputType === 'deleteWordBackward');
+    } else {
+      const value = this.ui.hiddenInput?.value || '';
+      this.commitText(e.data ?? (value.startsWith('\u200b') ? value.slice(1) : value));
     }
-    // Clear the hidden input value so it never overflows
+    this.resetInput();
+  }
+
+  commitText(text) {
+    for (const char of text) this.typingEngine.handleInput(char);
+  }
+
+  resetInput() {
+    // Keep a disposable character so mobile keyboards can delete at any index.
     if (this.ui.hiddenInput) {
-      this.ui.hiddenInput.value = '';
+      this.ui.hiddenInput.value = '\u200b';
+      this.ui.hiddenInput.setSelectionRange(1, 1);
     }
   }
 
+  canType() {
+    if (this.sessionFinished || this.ui.getOpenModal()) return false;
+    if (this.timer.isRunning) {
+      const elapsed = this.timer.getElapsedSeconds();
+      if (!this.timer.isInfinite && elapsed >= this.timer.totalDuration) {
+        this.finishSession(elapsed);
+        return false;
+      }
+      this.typingEngine.setElapsedSeconds(elapsed);
+    }
+    return true;
+  }
+
   focusInput() {
-    if (this.ui.hiddenInput) {
+    if (this.ui.hiddenInput && !this.ui.getOpenModal() && !this.sessionFinished) {
       this.ui.hiddenInput.focus();
       this.ui.showFocusOverlay(false);
     }
@@ -621,12 +676,14 @@ class TypingApp {
     document.querySelectorAll('[data-duration]:not(#custom-duration-pill)').forEach(pill => {
       const dur = parseInt(pill.dataset.duration, 10);
       pill.classList.toggle('active', dur === this.settings.duration);
+      pill.setAttribute('aria-checked', String(dur === this.settings.duration));
     });
 
     this.ui.updateCustomDurationPill(this.settings.duration);
 
     document.querySelectorAll('[data-difficulty]').forEach(pill => {
       pill.classList.toggle('active', pill.dataset.difficulty === this.settings.difficulty);
+      pill.setAttribute('aria-checked', String(pill.dataset.difficulty === this.settings.difficulty));
     });
   }
 
@@ -636,27 +693,34 @@ class TypingApp {
   }
 
   loadNewText() {
-    this.timer.reset();
-    this.timer.setDuration(this.settings.duration);
-    this.ui.updateTimer(this.settings.duration);
-
     this.currentText = TextGenerator.generateText(this.settings.difficulty, this.settings.duration);
-    this.typingEngine.setText(this.currentText);
-    this.ui.renderText(this.currentText);
-    this.focusInput();
+    this.restartCurrentText();
   }
 
   restartCurrentText() {
+    this.ui.hideResultsModal();
+    this.sessionFinished = false;
+    this.isComposing = false;
+    this.compositionCommit = null;
+    clearTimeout(this.compositionCommitTimer);
     this.timer.reset();
     this.timer.setDuration(this.settings.duration);
     this.ui.updateTimer(this.settings.duration);
 
     this.typingEngine.setText(this.currentText);
     this.ui.renderText(this.currentText);
+    this.resetInput();
+    this.ui.setFinishEnabled(false, this.settings.duration === 'inf');
     this.focusInput();
   }
 
   finishSession(elapsedSeconds) {
+    if (this.sessionFinished || !this.typingEngine.hasStarted) return;
+    this.sessionFinished = true;
+    this.timer.stop();
+    this.typingEngine.finish(elapsedSeconds);
+    this.ui.updateTimer(this.timer.isInfinite ? 'inf' : Math.max(0, Math.ceil(this.timer.totalDuration - elapsedSeconds)), elapsedSeconds);
+    this.ui.setFinishEnabled(false);
     SoundEffects.playFinishChime();
     const metrics = this.typingEngine.getMetrics();
     const prevBest = StorageManager.getBestScore(this.settings.difficulty, this.settings.duration);
@@ -669,14 +733,15 @@ class TypingApp {
       incorrectChars: metrics.incorrectChars,
       totalChars: metrics.totalChars,
       duration: this.settings.duration === 'inf' ? 'inf' : this.settings.duration,
-      timeSpent: Math.round(elapsedSeconds),
+      timeSpent: elapsedSeconds,
       difficulty: this.settings.difficulty
     };
 
     StorageManager.saveSession(sessionData);
     this.updateBestScoreBadge();
 
-    const isNewBest = !prevBest || metrics.wpm > prevBest.wpm;
+    const isNewBest = !prevBest || metrics.wpm > prevBest.wpm ||
+      (metrics.wpm === prevBest.wpm && metrics.accuracy > prevBest.accuracy);
     this.ui.showResultsModal(sessionData, isNewBest);
   }
 
@@ -689,6 +754,6 @@ class TypingApp {
 }
 
 // Bootstrap once DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => {
   window.app = new TypingApp();
 });
