@@ -3,6 +3,8 @@
  * Provides extensive randomized word streams for Easy, Medium, and Hard difficulty levels.
  */
 
+import { THAI_WORDS } from './thai-words.js';
+
 export const TextGenerator = (() => {
   // 300+ Common English words for Easy mode (lowercase, simple, high frequency)
   const EASY_WORDS = [
@@ -107,7 +109,7 @@ export const TextGenerator = (() => {
    * @param {number|string} duration - seconds (30, 60, 120, custom, or 'inf')
    * @returns {string} Randomized words sequence
    */
-  function generateText(difficulty = 'medium', duration = 60) {
+  function generateText(difficulty = 'medium', duration = 60, language = 'en') {
     let targetWords = 95;
     if (duration === 'inf' || duration === Infinity) {
       targetWords = 240;
@@ -119,6 +121,7 @@ export const TextGenerator = (() => {
     let wordPool = EASY_WORDS;
     if (difficulty === 'medium') wordPool = MEDIUM_WORDS;
     else if (difficulty === 'hard') wordPool = HARD_WORDS;
+    if (language === 'th') wordPool = THAI_WORDS[difficulty] || THAI_WORDS.medium;
 
     const resultWords = [];
     let shuffledPool = shuffle(wordPool);
@@ -140,11 +143,18 @@ export const TextGenerator = (() => {
       resultWords.push(word);
     }
 
+    if (language === 'th' && difficulty === 'hard') {
+      const sample = resultWords.join(' ');
+      if (!/[0-9๐-๙]/u.test(sample) || !/[():%!?/#".-]/u.test(sample)) {
+        resultWords[resultWords.length - 1] = 'คะแนน:100';
+      }
+    }
     return resultWords.join(' ');
   }
 
   return {
     generateText,
+    THAI_WORDS,
     EASY_WORDS,
     MEDIUM_WORDS,
     HARD_WORDS

@@ -173,6 +173,8 @@ export class TypingEngine {
     return {
       wpm: Math.round(netWpm),
       rawWpm: Math.round(grossWpm),
+      cpm: Math.round(netWpm * 5),
+      rawCpm: Math.round(grossWpm * 5),
       accuracy: Math.round(accuracy),
       correctChars,
       incorrectChars,

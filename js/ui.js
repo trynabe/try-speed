@@ -3,6 +3,8 @@
  * Handles DOM manipulation, character rendering, cursor positioning, modals, and focus states.
  */
 
+import { splitGraphemes } from './text-layout.js';
+
 export class UIController {
   constructor() {
     // DOM Elements
@@ -11,6 +13,7 @@ export class UIController {
     this.focusOverlay = document.getElementById('focus-overlay');
     this.timerDisplay = document.getElementById('timer-display');
     this.wpmDisplay = document.getElementById('wpm-display');
+    this.cpmDisplay = document.getElementById('cpm-display');
     this.accuracyDisplay = document.getElementById('accuracy-display');
     this.correctDisplay = document.getElementById('correct-display');
     this.incorrectDisplay = document.getElementById('incorrect-display');
@@ -68,6 +71,12 @@ export class UIController {
       if (this.charElements.length) this.measurePositions();
     });
     if (document.fonts && document.fonts.ready) {
+      document.fonts.addEventListener('loadingdone', () => {
+        if (this.charElements.length) {
+          this.measurePositions();
+          this.updateCaretPosition(this.caretIndex || 0);
+        }
+      });
       document.fonts.ready.then(() => {
         if (this.charElements.length) {
           this.measurePositions();
@@ -99,14 +108,22 @@ export class UIController {
       const wordSpan = document.createElement('span');
       wordSpan.className = 'word';
 
-      for (let i = 0; i < word.length; i++) {
-        const charSpan = document.createElement('span');
-        charSpan.className = 'char pending';
-        charSpan.textContent = word[i];
-        wordSpan.appendChild(charSpan);
-        this.charElements.push(charSpan);
-        this.isSpaceFlags.push(false);
-        this.appliedClasses.push('char pending');
+      const clusters = this.practiceLanguage === 'th' ? splitGraphemes(word, 'th') : word.split('');
+      for (const cluster of clusters) {
+        const container = this.practiceLanguage === 'th' ? document.createElement('span') : wordSpan;
+        if (container !== wordSpan) {
+          container.className = 'grapheme';
+          wordSpan.appendChild(container);
+        }
+        for (const char of cluster.split('')) {
+          const charSpan = document.createElement('span');
+          charSpan.className = 'char pending';
+          charSpan.textContent = char;
+          container.appendChild(charSpan);
+          this.charElements.push(charSpan);
+          this.isSpaceFlags.push(false);
+          this.appliedClasses.push('char pending');
+        }
       }
 
       if (w < words.length - 1) {
@@ -148,10 +165,13 @@ export class UIController {
 
     for (let i = 0; i < n; i++) {
       const el = this.charElements[i];
+      const cluster = el.parentElement.classList.contains('grapheme') ? el.parentElement : null;
+      const geometry = cluster || el;
+      const insideCluster = cluster && this.charElements[i - 1]?.parentElement === cluster;
       this.charPos[i] = {
-        left: el.offsetLeft,
-        top: el.offsetTop,
-        right: el.offsetLeft + el.offsetWidth
+        left: geometry.offsetLeft + (insideCluster ? geometry.offsetWidth : 0),
+        top: geometry.offsetTop,
+        right: geometry.offsetLeft + geometry.offsetWidth
       };
     }
 
@@ -159,7 +179,8 @@ export class UIController {
     this.linePitch = firstWord ? firstWord.offsetHeight : 42;
 
     if (this.caret && this.charElements[0]) {
-      this.caret.style.height = `${Math.round(this.charElements[0].offsetHeight) || 26}px`;
+      const first = this.practiceLanguage === 'th' ? this.charElements[0].parentElement : this.charElements[0];
+      this.caret.style.height = `${Math.round(first.offsetHeight) || 26}px`;
     }
   }
 
@@ -257,21 +278,23 @@ export class UIController {
     }, 700);
   }
 
-  updateLiveMetrics({ wpm, accuracy, correctChars, incorrectChars }) {
+  updateLiveMetrics({ wpm, cpm = 0, accuracy, correctChars, incorrectChars }) {
     if (typeof requestAnimationFrame === 'undefined') {
       if (this.wpmDisplay) this.wpmDisplay.textContent = wpm;
+      if (this.cpmDisplay) this.cpmDisplay.textContent = cpm;
       if (this.accuracyDisplay) this.accuracyDisplay.textContent = `${accuracy}%`;
       if (this.correctDisplay) this.correctDisplay.textContent = correctChars;
       if (this.incorrectDisplay) this.incorrectDisplay.textContent = incorrectChars;
       return;
     }
 
-    this._pendingMetrics = { wpm, accuracy, correctChars, incorrectChars };
+    this._pendingMetrics = { wpm, cpm, accuracy, correctChars, incorrectChars };
     if (this._metricsRaf) return;
     this._metricsRaf = requestAnimationFrame(() => {
       this._metricsRaf = null;
       const m = this._pendingMetrics;
       if (!m) return;
+      if (this.cpmDisplay && this.cpmDisplay.textContent !== String(m.cpm)) this.cpmDisplay.textContent = m.cpm;
       if (this.wpmDisplay && this.wpmDisplay.textContent !== String(m.wpm)) {
         this.wpmDisplay.textContent = m.wpm;
       }
@@ -334,6 +357,8 @@ export class UIController {
     if (!this.resultsModal) return;
 
     document.getElementById('res-wpm').textContent = sessionData.wpm;
+    document.getElementById('res-cpm').textContent = sessionData.cpm;
+    document.getElementById('res-language').textContent = sessionData.language === 'th' ? 'TH · ภาษาไทย' : 'EN · English';
     document.getElementById('res-raw-wpm').textContent = sessionData.rawWpm;
     document.getElementById('res-accuracy').textContent = `${sessionData.accuracy}%`;
     document.getElementById('res-correct').textContent = sessionData.correctChars;
@@ -430,7 +455,7 @@ export class UIController {
 
       const accSpan = document.createElement('span');
       accSpan.className = 'hist-acc';
-      accSpan.textContent = `${item.accuracy}% acc`;
+      accSpan.textContent = `${item.accuracy}% acc · ${item.cpm ?? 0} CPM`;
 
       colMain.append(wpmSpan, accSpan);
 
@@ -439,7 +464,7 @@ export class UIController {
 
       const modeSpan = document.createElement('span');
       modeSpan.className = 'hist-mode';
-      modeSpan.textContent = `${item.duration === 'inf' ? '∞ Zen' : `${item.duration}s`} • ${item.difficulty}`;
+      modeSpan.textContent = `${item.language === 'th' ? 'TH' : 'EN'} • ${item.duration === 'inf' ? '∞ Zen' : `${item.duration}s`} • ${item.difficulty}`;
 
       const charsSpan = document.createElement('span');
       charsSpan.className = 'hist-chars';
@@ -635,5 +660,20 @@ export class UIController {
     if (!this.finishBtn) return;
     this.finishBtn.disabled = !enabled;
     if (show !== undefined) this.finishBtn.classList.toggle('hidden', !show);
+  }
+
+  setPracticeLanguage(language) {
+    this.practiceLanguage = language === 'th' ? 'th' : 'en';
+    this.textDisplay?.setAttribute('lang', this.practiceLanguage);
+    this.hiddenInput?.setAttribute('lang', this.practiceLanguage);
+    const note = document.getElementById('practice-language-note');
+    if (note) {
+      note.lang = this.practiceLanguage;
+      note.textContent = this.practiceLanguage === 'th'
+        ? 'พิมพ์ทีละคำ แล้วกด Space · CPM = ตัวอักษรที่ถูกต้องต่อนาที (รวมสระและวรรณยุกต์)'
+        : 'Type each word, then press Space. CPM = correct characters per minute.';
+    }
+    const badgeLabel = document.getElementById('best-mode-label');
+    if (badgeLabel) badgeLabel.textContent = `${this.practiceLanguage.toUpperCase()} Best:`;
   }
 }

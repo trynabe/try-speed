@@ -1,11 +1,18 @@
-# Try-Speed — English Typing Practice for Developers
+# Try-Speed — English & Thai Typing Practice
 
-A modern, developer-aesthetic English typing practice web application with coding typography, custom durations, infinite mode, and free theme/color customization.
+A typing practice web application for English and Thai, with custom durations, infinite mode, live WPM/CPM, and theme/color customization.
 
 ## Features
 
+- **English / Thai Practice**:
+  - Switch **EN | TH** in the controls; the chosen language is saved locally.
+  - Thai Easy uses common short words; Medium adds upper/lower vowels and all four tone marks; Hard adds specialist vocabulary, long words, numbers and punctuation.
+  - Thai words are separated by single spaces for Spacebar practice. Switch your keyboard to Thai before typing.
+  - Thai text uses Noto Sans Thai with Sarabun, Leelawadee UI and Tahoma fallbacks. Combining vowels and tone marks share a grapheme container, while each typed character retains independent correctness and backspace handling.
+  - Personal bests are separated by language, difficulty and duration. Existing records are retained as English records. History shows EN/TH and CPM.
+
 - **Developer / Coding Monospace Typography**:
-  - Full site-wide `JetBrains Mono` / Monospace styling across headings, buttons, modals, badges, and the typing arena.
+  - `JetBrains Mono` / Monospace styling across the interface and English arena, with a Thai-specific font for Thai practice.
 - **Custom Durations & Infinite (`inf`) Mode**:
   - Choose between standard 30s, 60s, 120s, or click **Custom**.
   - Enter any duration in seconds (e.g. `15`, `45`, `90`).
@@ -25,12 +32,12 @@ A modern, developer-aesthetic English typing practice web application with codin
   - Dedicated visual markers for mistyped spaces.
   - Smooth sliding caret with line-scrolling compensation.
 - **Dynamic Scoring**:
-  - Words Per Minute (Net WPM) & Raw Gross WPM.
+  - Words Per Minute (Net WPM), Raw Gross WPM, and Characters Per Minute (CPM).
   - Accuracy percentage.
   - Correct and incorrect character counts.
   - Backspace & `Ctrl` + `Backspace` support that recalculates scores dynamically.
 - **Local Persistence & Personal Bests**:
-  - Tracks personal best score per duration and difficulty mode.
+  - Tracks personal best score per language, duration and difficulty mode.
   - History drawer showing the latest 100 sessions and their summary statistics. Personal bests retain records from older sessions.
   - Clear history option.
 - **Keyboard Navigation & Shortcuts**:
@@ -61,8 +68,10 @@ Run all tests with Node.js 22 or newer (no npm dependencies to install):
 npm test
 ```
 
-The suite includes session deadline/completion, exact elapsed scoring, infinite text continuation, composition input, storage recovery, modal focus, and custom-audio persistence/playback regressions.
+The suite includes session deadline/completion, exact elapsed scoring, infinite text continuation, composition input, storage recovery, modal focus, custom-audio persistence/playback, and Thai dictionary/rendering/scoring/legacy-record regressions.
 
 Custom audio files must be smaller than 3.5 MiB and fit available browser storage. Upload errors keep the previous sound. Each key plays up to the first 0.25 seconds of the file, with at most 16 overlapping custom sounds. Mute stops active custom sounds; volume changes apply to sounds already playing.
 
 Accuracy measures all keystrokes, including mistakes later erased. Net WPM measures correct characters still present; raw WPM includes all typed characters. Results use the same elapsed time as scoring.
+
+For both languages, CPM = correct characters / elapsed minutes, and WPM = correct characters / 5 / elapsed minutes. Spaces, Thai vowels and tone marks each count as one character; WPM is a standardized five-character unit, not a count of natural-language words. For example, 150 correct characters in 30 seconds gives 300 CPM and 60 WPM. Each displayed metric is rounded independently.

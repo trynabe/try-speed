@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
 };
 
 const DEFAULT_SETTINGS = {
+  language: 'en',
   duration: 60,
   difficulty: 'medium',
   theme: 'dark',
@@ -33,6 +34,7 @@ function normalizeSettings(value) {
   const colors = isRecord(data.customColors) ? data.customColors : {};
   const hex = color => typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color);
   return {
+    language: ['en', 'th'].includes(data.language) ? data.language : DEFAULT_SETTINGS.language,
     duration: validDuration(data.duration) ? data.duration : DEFAULT_SETTINGS.duration,
     difficulty: validDifficulty(data.difficulty) ? data.difficulty : DEFAULT_SETTINGS.difficulty,
     theme: ['dark', 'light', 'matrix', 'dracula', 'cyberpunk', 'nord', 'monokai', 'catppuccin', 'custom'].includes(data.theme) ? data.theme : DEFAULT_SETTINGS.theme,
@@ -74,7 +76,11 @@ export const StorageManager = {
       const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
       const history = data ? JSON.parse(data) : [];
       return Array.isArray(history) ? history.filter(entry => validScore(entry) && nonnegative(entry.timestamp) &&
-        ['rawWpm', 'correctChars', 'incorrectChars', 'totalChars', 'timeSpent'].every(key => nonnegative(entry[key]))).slice(0, 100) : [];
+        ['rawWpm', 'correctChars', 'incorrectChars', 'totalChars', 'timeSpent'].every(key => nonnegative(entry[key]))).slice(0, 100).map(entry => ({
+          ...entry,
+          language: entry.language === 'th' ? 'th' : 'en',
+          cpm: nonnegative(entry.cpm) ? entry.cpm : (entry.timeSpent > 0 ? Math.round(entry.correctChars * 60 / entry.timeSpent) : 0)
+        })) : [];
     } catch (e) {
       console.error('Failed to load history:', e);
       return [];
@@ -87,6 +93,8 @@ export const StorageManager = {
       const newEntry = {
         id: 'sess_' + Date.now(),
         timestamp: Date.now(),
+        language: session.language === 'th' ? 'th' : 'en',
+        cpm: nonnegative(session.cpm) ? Math.round(session.cpm) : (session.timeSpent > 0 ? Math.round(session.correctChars * 60 / session.timeSpent) : 0),
         wpm: Math.round(session.wpm),
         rawWpm: Math.round(session.rawWpm),
         accuracy: Math.round(session.accuracy),
@@ -118,11 +126,14 @@ export const StorageManager = {
   updateBestScore(entry) {
     try {
       const bestScores = this.getAllBestScores();
-      const key = `${entry.difficulty}_${entry.duration}`;
+      const language = entry.language === 'th' ? 'th' : 'en';
+      const key = `${language}_${entry.difficulty}_${entry.duration}`;
       const existing = bestScores[key];
 
       if (!existing || entry.wpm > existing.wpm || (entry.wpm === existing.wpm && entry.accuracy > existing.accuracy)) {
         bestScores[key] = {
+          language,
+          cpm: entry.cpm,
           wpm: entry.wpm,
           accuracy: entry.accuracy,
           date: entry.timestamp,
@@ -131,10 +142,14 @@ export const StorageManager = {
         };
       }
 
-      // Also track overall best
-      if (!bestScores.overall || entry.wpm > bestScores.overall.wpm ||
-          (entry.wpm === bestScores.overall.wpm && entry.accuracy > bestScores.overall.accuracy)) {
-        bestScores.overall = {
+      // Overall records are also separated by practice language.
+      const overallKey = `${language}_overall`;
+      const overall = bestScores[overallKey];
+      if (!overall || entry.wpm > overall.wpm ||
+          (entry.wpm === overall.wpm && entry.accuracy > overall.accuracy)) {
+        bestScores[overallKey] = {
+          language,
+          cpm: entry.cpm,
           wpm: entry.wpm,
           accuracy: entry.accuracy,
           date: entry.timestamp,
@@ -153,21 +168,32 @@ export const StorageManager = {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.BEST_SCORES);
       const scores = data ? JSON.parse(data) : {};
-      return isRecord(scores) ? Object.fromEntries(Object.entries(scores).filter(([key, value]) =>
-        (key === 'overall' || /^(easy|medium|hard)_(inf|\d+)$/.test(key)) && validScore(value))) : {};
+      const normalized = {};
+      if (!isRecord(scores)) return normalized;
+      for (const [key, value] of Object.entries(scores)) {
+        if (!validScore(value)) continue;
+        const legacy = key === 'overall' || /^(easy|medium|hard)_(inf|\d+)$/.test(key);
+        if (!legacy && !/^(en|th)_(overall|(easy|medium|hard)_(inf|\d+))$/.test(key)) continue;
+        // Existing records predate Thai mode and must remain English records.
+        const nextKey = legacy ? `en_${key}` : key;
+        const candidate = { ...value, language: nextKey.slice(0, 2) };
+        const previous = normalized[nextKey];
+        if (!previous || candidate.wpm > previous.wpm || (candidate.wpm === previous.wpm && candidate.accuracy > previous.accuracy)) normalized[nextKey] = candidate;
+      }
+      return normalized;
     } catch (e) {
       console.error('Failed to load best scores:', e);
       return {};
     }
   },
 
-  getBestScore(difficulty, duration) {
+  getBestScore(difficulty, duration, language = 'en') {
     const all = this.getAllBestScores();
     if (difficulty && duration) {
-      const key = `${difficulty}_${duration}`;
+      const key = `${language}_${difficulty}_${duration}`;
       return all[key] || null;
     }
-    return all.overall || null;
+    return all[`${language}_overall`] || null;
   },
 
   getSummaryStats() {

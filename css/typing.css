@@ -73,6 +73,27 @@
 }
 
 /* Word & Character spans */
+.text-display[lang="th"], .practice-note[lang="th"] {
+  font-family: 'Noto Sans Thai', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif;
+  letter-spacing: 0;
+}
+
+.text-display[lang="th"] .grapheme {
+  display: inline-block;
+  line-height: 1.8;
+  white-space: nowrap;
+}
+
+/* Inline mark spans share their base glyph's shaping run and never wrap alone. */
+.text-display[lang="th"] .grapheme .char {
+  display: inline;
+  position: static;
+  line-height: inherit;
+}
+
+.practice-note { font-size: 0.85rem; color: var(--text-muted); line-height: 1.7; }
+.cpm-stat { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
+
 .word {
   display: inline-flex;
   height: var(--typing-line-height);

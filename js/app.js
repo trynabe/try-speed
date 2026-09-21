@@ -50,7 +50,7 @@ export class TypingApp {
       beforeInput: () => this.canType(),
       onTextExhausted: () => {
         if (this.settings.duration !== 'inf') return;
-        this.typingEngine.appendText(' ' + TextGenerator.generateText(this.settings.difficulty, 'inf'));
+        this.typingEngine.appendText(' ' + TextGenerator.generateText(this.settings.difficulty, 'inf', this.settings.language));
         this.ui.renderText(this.typingEngine.targetText);
       },
       onStateChange: (metrics) => {
@@ -196,6 +196,10 @@ export class TypingApp {
       });
       customDurInput.addEventListener('input', () => customDurInput.setCustomValidity(''));
     }
+
+    document.querySelectorAll('[data-language]').forEach(pill => {
+      pill.addEventListener('click', () => this.setLanguage(pill.dataset.language));
+    });
 
     // Difficulty options
     const difficultyPills = document.querySelectorAll('[data-difficulty]');
@@ -672,7 +676,21 @@ export class TypingApp {
     this.loadNewText();
   }
 
+  setLanguage(language) {
+    if (!['en', 'th'].includes(language) || this.settings.language === language) return;
+    this.settings.language = language;
+    StorageManager.saveSettings({ language });
+    this.applyActiveSettingsPills();
+    this.updateBestScoreBadge();
+    this.loadNewText();
+  }
+
   applyActiveSettingsPills() {
+    document.querySelectorAll('[data-language]').forEach(pill => {
+      const active = pill.dataset.language === this.settings.language;
+      pill.classList.toggle('active', active);
+      pill.setAttribute('aria-checked', String(active));
+    });
     document.querySelectorAll('[data-duration]:not(#custom-duration-pill)').forEach(pill => {
       const dur = parseInt(pill.dataset.duration, 10);
       pill.classList.toggle('active', dur === this.settings.duration);
@@ -688,12 +706,12 @@ export class TypingApp {
   }
 
   updateBestScoreBadge() {
-    const best = StorageManager.getBestScore(this.settings.difficulty, this.settings.duration);
+    const best = StorageManager.getBestScore(this.settings.difficulty, this.settings.duration, this.settings.language);
     this.ui.updateBestBadge(best);
   }
 
   loadNewText() {
-    this.currentText = TextGenerator.generateText(this.settings.difficulty, this.settings.duration);
+    this.currentText = TextGenerator.generateText(this.settings.difficulty, this.settings.duration, this.settings.language);
     this.restartCurrentText();
   }
 
@@ -706,6 +724,7 @@ export class TypingApp {
     this.timer.reset();
     this.timer.setDuration(this.settings.duration);
     this.ui.updateTimer(this.settings.duration);
+    this.ui.setPracticeLanguage(this.settings.language);
 
     this.typingEngine.setText(this.currentText);
     this.ui.renderText(this.currentText);
@@ -723,9 +742,11 @@ export class TypingApp {
     this.ui.setFinishEnabled(false);
     SoundEffects.playFinishChime();
     const metrics = this.typingEngine.getMetrics();
-    const prevBest = StorageManager.getBestScore(this.settings.difficulty, this.settings.duration);
+    const prevBest = StorageManager.getBestScore(this.settings.difficulty, this.settings.duration, this.settings.language);
 
     const sessionData = {
+      language: this.settings.language,
+      cpm: metrics.cpm,
       wpm: metrics.wpm,
       rawWpm: metrics.rawWpm,
       accuracy: metrics.accuracy,

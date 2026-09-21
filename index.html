@@ -10,7 +10,7 @@
   <!-- Google Font (with robust system monospace fallback for offline) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/main.css">
@@ -29,7 +29,7 @@
       <div class="header-actions">
         <!-- Personal Best Indicator -->
         <div class="best-badge" title="Personal best score for current mode">
-          <span>Best:</span>
+          <span id="best-mode-label">EN Best:</span>
           <strong id="best-wpm-badge">--</strong>
         </div>
 
@@ -74,6 +74,13 @@
     <main class="typing-section">
       <!-- Controls Bar -->
       <section class="controls-bar" aria-label="Practice settings">
+        <div class="control-group language-control">
+          <span class="control-label">Language:</span>
+          <div class="pill-group" role="radiogroup" aria-label="Practice language">
+            <button class="pill-btn active" data-language="en" role="radio" aria-checked="true" title="English practice">EN</button>
+            <button class="pill-btn" data-language="th" role="radio" aria-checked="false" title="ฝึกพิมพ์ภาษาไทย">TH</button>
+          </div>
+        </div>
         <div class="control-group">
           <span class="control-label">Duration:</span>
           <div class="pill-group" role="radiogroup" aria-label="Select session duration">
@@ -102,8 +109,9 @@
         </div>
 
         <div class="stat-item">
-          <span class="stat-label">Speed</span>
+          <span class="stat-label" title="WPM uses 5 correct characters per word, including spaces and Thai marks.">Speed</span>
           <div class="stat-value"><span id="wpm-display">0</span> <small style="font-size: 0.85rem; color: var(--text-muted);">WPM</small></div>
+          <div class="cpm-stat"><span id="cpm-display">0</span> CPM</div>
         </div>
 
         <div class="stat-item">
@@ -120,6 +128,8 @@
           </div>
         </div>
       </section>
+
+      <p id="practice-language-note" class="practice-note">Type each word, then press Space. CPM = correct characters per minute.</p>
 
       <!-- Typing Arena -->
       <section class="typing-arena" id="typing-arena" aria-label="Typing text area">
@@ -199,6 +209,7 @@
 
       <div class="modal-body">
         <div class="results-hero">
+          <div id="res-language" class="practice-note">EN · English</div>
           <div id="res-new-best" class="res-new-best hidden">🎉 New Personal Best!</div>
           <div id="res-badge" class="res-badge badge-advanced">🔥 Fast & Accurate</div>
           <div class="res-primary-stat">
@@ -208,6 +219,10 @@
         </div>
 
         <div class="results-grid">
+          <div class="res-card">
+            <span class="res-card-label">CPM (correct chars/min)</span>
+            <span id="res-cpm" class="res-card-val">0</span>
+          </div>
           <div class="res-card">
             <span class="res-card-label">Accuracy</span>
             <span id="res-accuracy" class="res-card-val">100%</span>
@@ -259,7 +274,7 @@
       </div>
 
       <div class="modal-body">
-        <p>Summary of your latest 100 sessions. Personal bests include all saved sessions.</p>
+        <p>Summary of your latest 100 sessions across EN and TH. Personal bests are separate for each language.</p>
         <div class="history-summary-grid">
           <div class="hist-summary-card">
             <div class="hist-summary-label">Recent Tests</div>

@@ -76,7 +76,7 @@ function makeApp(duration = 1) {
     customDurModal: document.getElementById('custom-duration-modal'),
     restartBtn: document.getElementById('restart-btn'),
     modals: [], results: [],
-    setSoundState() {}, updateSoundVolumeUI() {}, updateSoundProfileUI() {}, setTheme() {},
+    setSoundState() {}, updateSoundVolumeUI() {}, updateSoundProfileUI() {}, setTheme() {}, setPracticeLanguage() {},
     updateCustomDurationPill() {}, updateBestBadge() {}, updateTimer(value, elapsed) { this.timer = { value, elapsed }; },
     updateCharacterStates() {}, updateLiveMetrics(metrics) { this.metrics = metrics; },
     renderText(text) { this.text = text; }, showFocusOverlay() {}, setFinishEnabled(enabled) { this.finishEnabled = enabled; },
@@ -281,6 +281,52 @@ test('custom light backgrounds choose readable text and presets clear custom ove
   assert.equal(values.has('--bg-surface'),false);
 });
 
+test('language changes persist, reset an active session, and generate Thai text', () => {
+  const app = makeApp(60);
+  app.commitText('a');
+  app.setLanguage('th');
+  assert.equal(StorageManager.getSettings().language, 'th');
+  assert.equal(app.timer.isRunning, false);
+  assert.equal(app.typingEngine.currentIndex, 0);
+  assert.match(app.currentText, /[ก-๙]/u);
+  assert.equal(StorageManager.getHistory().length, 0);
+  const reloaded = makeApp(60);
+  assert.equal(reloaded.settings.language, 'th');
+  app.setLanguage('en');
+  assert.doesNotMatch(app.currentText, /[ก-๙]/u);
+});
+
+test('Thai composition commits each vowel and tone mark once and saves language/CPM', () => {
+  const app = makeApp(30);
+  app.setLanguage('th');
+  app.currentText = 'กุ้ง น้ำ'; app.restartCurrentText();
+  const input = app.ui.hiddenInput;
+  input.fire('compositionstart');
+  for (const data of ['ก', 'กุ', 'กุ้', 'กุ้ง']) input.fire('input', { data, inputType: 'insertCompositionText', isComposing: true });
+  assert.equal(app.typingEngine.currentIndex, 0);
+  input.fire('compositionend', { data: 'กุ้ง' });
+  input.fire('input', { data: 'กุ้ง', inputType: 'insertFromComposition' });
+  now = 10000;
+  input.fire('input', { data: ' น้ำ', inputType: 'insertText' });
+  const saved = StorageManager.getHistory()[0];
+  assert.equal(saved.language, 'th');
+  assert.equal(saved.correctChars, 'กุ้ง น้ำ'.length);
+  assert.equal(saved.accuracy, 100);
+  assert.equal(saved.cpm, 'กุ้ง น้ำ'.length * 6);
+  assert.equal(StorageManager.getBestScore('easy', 30, 'en'), null);
+  assert.ok(StorageManager.getBestScore('easy', 30, 'th'));
+});
+
+test('Thai infinite text extension stays Thai and does not finish automatically', () => {
+  const app = makeApp('inf');
+  app.setLanguage('th');
+  app.currentText = 'บ้าน'; app.restartCurrentText();
+  app.commitText('บ้าน');
+  assert.equal(app.typingEngine.isCompleted, false);
+  assert.equal(app.typingEngine.targetText.slice(0, 5), 'บ้าน ');
+  assert.doesNotMatch(app.typingEngine.targetText, /[a-z]/i);
+});
+
 test('renderHistory constructs safe DOM nodes without raw HTML injection', () => {
   const ui = Object.create(UIController.prototype);
   const malicious = '<img src=x onerror=alert(1)>';
@@ -300,7 +346,7 @@ test('renderHistory constructs safe DOM nodes without raw HTML injection', () =>
   assert.equal(item.className, 'history-item');
   const details = item.children[1];
   const modeSpan = details.children[0];
-  assert.equal(modeSpan.textContent, `30s • ${malicious}`);
+  assert.equal(modeSpan.textContent, `EN • 30s • ${malicious}`);
 });
 
 test('updateCharacterStates efficiently updates targeted range on keystrokes and deletions', () => {
@@ -337,4 +383,3 @@ test('updateCharacterStates efficiently updates targeted range on keystrokes and
   assert.equal(charElements[0].className, 'char pending active-char');
   assert.equal(charElements[1].className, 'char pending');
 });
-
