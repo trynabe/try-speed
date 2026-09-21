@@ -124,8 +124,15 @@ export class UIController {
 
     this.textDisplay.innerHTML = '';
     this.textDisplay.appendChild(frag);
+    this.textDisplay.style.scrollBehavior = 'auto';
     this.textDisplay.scrollTop = 0;
     this.scrollTopCache = 0;
+    this.lastCaretTop = undefined;
+    if (typeof requestAnimationFrame !== 'undefined') {
+      requestAnimationFrame(() => {
+        if (this.textDisplay) this.textDisplay.style.scrollBehavior = '';
+      });
+    }
 
     this.measurePositions();
     this.updateCaretPosition(0);
@@ -221,8 +228,21 @@ export class UIController {
       this.textDisplay.scrollTop = targetScrollTop;
     }
 
-    // transform is compositor-only; left/top would relayout every keystroke
-    this.caret.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+    // Snap instantly on line changes so caret does not glide diagonally across the screen
+    const lineChanged = this.lastCaretTop !== undefined && this.lastCaretTop !== top;
+    this.lastCaretTop = top;
+
+    if (lineChanged) {
+      this.caret.style.transition = 'none';
+      this.caret.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+      if (typeof requestAnimationFrame !== 'undefined') {
+        requestAnimationFrame(() => {
+          if (this.caret) this.caret.style.transition = '';
+        });
+      }
+    } else {
+      this.caret.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+    }
 
     this.markTyping();
   }
@@ -238,10 +258,34 @@ export class UIController {
   }
 
   updateLiveMetrics({ wpm, accuracy, correctChars, incorrectChars }) {
-    if (this.wpmDisplay) this.wpmDisplay.textContent = wpm;
-    if (this.accuracyDisplay) this.accuracyDisplay.textContent = `${accuracy}%`;
-    if (this.correctDisplay) this.correctDisplay.textContent = correctChars;
-    if (this.incorrectDisplay) this.incorrectDisplay.textContent = incorrectChars;
+    if (typeof requestAnimationFrame === 'undefined') {
+      if (this.wpmDisplay) this.wpmDisplay.textContent = wpm;
+      if (this.accuracyDisplay) this.accuracyDisplay.textContent = `${accuracy}%`;
+      if (this.correctDisplay) this.correctDisplay.textContent = correctChars;
+      if (this.incorrectDisplay) this.incorrectDisplay.textContent = incorrectChars;
+      return;
+    }
+
+    this._pendingMetrics = { wpm, accuracy, correctChars, incorrectChars };
+    if (this._metricsRaf) return;
+    this._metricsRaf = requestAnimationFrame(() => {
+      this._metricsRaf = null;
+      const m = this._pendingMetrics;
+      if (!m) return;
+      if (this.wpmDisplay && this.wpmDisplay.textContent !== String(m.wpm)) {
+        this.wpmDisplay.textContent = m.wpm;
+      }
+      if (this.accuracyDisplay) {
+        const accStr = `${m.accuracy}%`;
+        if (this.accuracyDisplay.textContent !== accStr) this.accuracyDisplay.textContent = accStr;
+      }
+      if (this.correctDisplay && this.correctDisplay.textContent !== String(m.correctChars)) {
+        this.correctDisplay.textContent = m.correctChars;
+      }
+      if (this.incorrectDisplay && this.incorrectDisplay.textContent !== String(m.incorrectChars)) {
+        this.incorrectDisplay.textContent = m.incorrectChars;
+      }
+    });
   }
 
   updateTimer(remainingOrMode, elapsedSeconds = 0) {

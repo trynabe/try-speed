@@ -15,6 +15,8 @@ export class TypingEngine {
     this.totalKeystrokes = 0;
     this.correctKeystrokes = 0;
     this.incorrectKeystrokes = 0;
+    this.correctCharsCount = 0;
+    this.incorrectCharsCount = 0;
     this.elapsedSeconds = 0;
 
     // Callbacks
@@ -40,6 +42,8 @@ export class TypingEngine {
     this.totalKeystrokes = 0;
     this.correctKeystrokes = 0;
     this.incorrectKeystrokes = 0;
+    this.correctCharsCount = 0;
+    this.incorrectCharsCount = 0;
     this.elapsedSeconds = 0;
 
     this.onStateChange(this.getMetrics());
@@ -79,10 +83,12 @@ export class TypingEngine {
     this.totalKeystrokes++;
     if (isCorrect) {
       this.correctKeystrokes++;
+      this.correctCharsCount++;
       this.charStates[this.currentIndex].state = 'correct';
       this.onSound(false);
     } else {
       this.incorrectKeystrokes++;
+      this.incorrectCharsCount++;
       this.charStates[this.currentIndex].state = 'incorrect';
       this.onSound(true);
     }
@@ -111,11 +117,17 @@ export class TypingEngine {
       let targetIndex = this.currentIndex - 1;
       // Skip trailing spaces if any
       while (targetIndex > 0 && this.charStates[targetIndex].char === ' ') {
+        const prev = this.charStates[targetIndex].state;
+        if (prev === 'correct') this.correctCharsCount--;
+        else if (prev === 'incorrect') this.incorrectCharsCount--;
         this.charStates[targetIndex].state = 'pending';
         targetIndex--;
       }
       // Delete until space or start
       while (targetIndex >= 0 && this.charStates[targetIndex].char !== ' ') {
+        const prev = this.charStates[targetIndex].state;
+        if (prev === 'correct') this.correctCharsCount--;
+        else if (prev === 'incorrect') this.incorrectCharsCount--;
         this.charStates[targetIndex].state = 'pending';
         targetIndex--;
       }
@@ -123,6 +135,9 @@ export class TypingEngine {
     } else {
       // Single character backspace
       this.currentIndex--;
+      const prev = this.charStates[this.currentIndex].state;
+      if (prev === 'correct') this.correctCharsCount--;
+      else if (prev === 'incorrect') this.incorrectCharsCount--;
       this.charStates[this.currentIndex].state = 'pending';
     }
 
@@ -130,16 +145,9 @@ export class TypingEngine {
   }
 
   getMetrics() {
-    let correctChars = 0;
-    let incorrectChars = 0;
-    let pendingChars = 0;
-
-    for (let i = 0; i < this.charStates.length; i++) {
-      const s = this.charStates[i].state;
-      if (s === 'correct') correctChars++;
-      else if (s === 'incorrect') incorrectChars++;
-      else pendingChars++;
-    }
+    const correctChars = this.correctCharsCount;
+    const incorrectChars = this.incorrectCharsCount;
+    const pendingChars = Math.max(0, this.charStates.length - this.currentIndex);
 
     const effectiveTimeMin = Math.max(Number.EPSILON, this.elapsedSeconds / 60);
 
