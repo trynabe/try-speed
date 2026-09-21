@@ -603,6 +603,12 @@ export class TypingApp {
       return;
     }
 
+    // Ignore Grave Accent / Tilde (universal Thai/EN language switch key in Windows)
+    if (e.key === '`' || e.key === '~' || e.code === 'Backquote') {
+      e.preventDefault();
+      return;
+    }
+
     if (e.key === 'Tab') {
       return; // allow normal tab navigation
     }
@@ -618,6 +624,10 @@ export class TypingApp {
       return;
     }
     this.compositionCommit = null;
+    if (e.data === '`' || e.data === '~') {
+      this.resetInput();
+      return;
+    }
     if (e.inputType?.startsWith('delete')) {
       this.typingEngine.handleInput('Backspace', e.inputType === 'deleteWordBackward');
     } else {
@@ -677,7 +687,11 @@ export class TypingApp {
   }
 
   setLanguage(language) {
-    if (!['en', 'th'].includes(language) || this.settings.language === language) return;
+    if (!['en', 'th'].includes(language)) return;
+    if (this.settings.language === language) {
+      this.loadNewText();
+      return;
+    }
     this.settings.language = language;
     StorageManager.saveSettings({ language });
     this.applyActiveSettingsPills();

@@ -292,6 +292,14 @@ test('language changes persist, reset an active session, and generate Thai text'
   assert.equal(StorageManager.getHistory().length, 0);
   const reloaded = makeApp(60);
   assert.equal(reloaded.settings.language, 'th');
+  const prevText = app.currentText;
+  app.setLanguage('th');
+  assert.equal(typeof app.currentText, 'string');
+  // Grave accent / tilde language switch key is ignored
+  const input = app.ui.hiddenInput;
+  input.fire('keydown', { key: '`' });
+  input.fire('input', { data: '`', inputType: 'insertText' });
+  assert.equal(app.typingEngine.currentIndex, 0);
   app.setLanguage('en');
   assert.doesNotMatch(app.currentText, /[ก-๙]/u);
 });

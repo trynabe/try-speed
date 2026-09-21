@@ -670,7 +670,7 @@ export class UIController {
     if (note) {
       note.lang = this.practiceLanguage;
       note.textContent = this.practiceLanguage === 'th'
-        ? 'พิมพ์ทีละคำ แล้วกด Space · CPM = ตัวอักษรที่ถูกต้องต่อนาที (รวมสระและวรรณยุกต์)'
+        ? 'สลับแป้นพิมพ์เป็นภาษาไทย · พิมพ์ทีละคำ แล้วกด Space · CPM = ตัวอักษรที่ถูกต้องต่อนาที (รวมสระและวรรณยุกต์)'
         : 'Type each word, then press Space. CPM = correct characters per minute.';
     }
     const badgeLabel = document.getElementById('best-mode-label');
