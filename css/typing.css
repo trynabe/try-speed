@@ -74,8 +74,11 @@
 
 /* Word & Character spans */
 .text-display[lang="th"], .practice-note[lang="th"] {
-  font-family: 'Noto Sans Thai', 'Sarabun', 'Leelawadee UI', Tahoma, sans-serif;
+  /* The global monospace rule is !important, so Thai must explicitly opt out. */
+  font-family: var(--font-thai) !important;
   letter-spacing: 0;
+  font-feature-settings: "kern" 1, "liga" 1;
+  font-kerning: normal;
 }
 
 .text-display[lang="th"] .grapheme {
@@ -114,7 +117,7 @@
 }
 
 .char.correct {
-  color: var(--text-main);
+  color: var(--correct);
 }
 
 .char.incorrect {

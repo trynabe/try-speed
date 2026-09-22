@@ -8,7 +8,7 @@ A typing practice web application for English and Thai, with custom durations, i
   - Switch **EN | TH** in the controls; the chosen language is saved locally.
   - Thai Easy uses common short words; Medium adds upper/lower vowels and all four tone marks; Hard adds specialist vocabulary, long words, numbers and punctuation.
   - Thai words are separated by single spaces for Spacebar practice. Switch your keyboard to Thai before typing.
-  - Thai text uses Noto Sans Thai with Sarabun, Leelawadee UI and Tahoma fallbacks. Combining vowels and tone marks share a grapheme container, while each typed character retains independent correctness and backspace handling.
+  - Thai text uses IBM Plex Sans Thai with Noto Sans Thai, Leelawadee UI and Tahoma fallbacks. Combining vowels and tone marks share a grapheme container, while each typed character gets immediate, independent correctness and backspace handling—even during IME composition.
   - Personal bests are separated by language, difficulty and duration. Existing records are retained as English records. History shows EN/TH and CPM.
 
 - **Developer / Coding Monospace Typography**:

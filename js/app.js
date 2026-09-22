@@ -17,6 +17,7 @@ export class TypingApp {
     this.currentText = '';
     this.sessionFinished = false;
     this.isComposing = false;
+    this.compositionText = '';
 
     // Initialize Audio Engine
     SoundEffects.setMuted(!this.settings.soundEnabled);
@@ -91,6 +92,7 @@ export class TypingApp {
       input.addEventListener('input', (e) => this.handleMobileInput(e));
       input.addEventListener('compositionstart', () => {
         this.isComposing = true;
+        this.compositionText = '';
         this.compositionCommit = null;
       });
       input.addEventListener('compositionend', (e) => {
@@ -99,10 +101,11 @@ export class TypingApp {
         // combining mark) while the textarea contains the complete commit.
         // Prefer the actual input value so no vowel/tone mark is lost.
         const inputValue = this.getPendingInputText();
-        const committedText = inputValue || e.data || '';
-        this.commitText(committedText);
+        const committedText = inputValue || e.data || this.compositionText;
+        this.syncCompositionText(committedText);
         // Some browsers emit one final input immediately after compositionend.
         this.compositionCommit = committedText || null;
+        this.compositionText = '';
         clearTimeout(this.compositionCommitTimer);
         this.compositionCommitTimer = setTimeout(() => { this.compositionCommit = null; }, 0);
         this.resetInput();
@@ -625,7 +628,13 @@ export class TypingApp {
   }
 
   handleMobileInput(e) {
-    if (e.isComposing || this.isComposing) return;
+    if (e.isComposing || this.isComposing) {
+      // Composition events contain the complete in-progress string. Apply its
+      // delta so Thai bases, vowels and tone marks get feedback immediately.
+      const inputValue = this.getPendingInputText();
+      this.syncCompositionText(inputValue || e.data || '');
+      return;
+    }
     if (
       this.compositionCommit != null &&
       (e.inputType === 'insertFromComposition' || e.data === this.compositionCommit)
@@ -655,6 +664,27 @@ export class TypingApp {
 
   isExpectedCharacter(char) {
     return this.typingEngine.charStates[this.typingEngine.currentIndex]?.char === char;
+  }
+
+  syncCompositionText(nextText) {
+    const previous = [...this.compositionText];
+    const next = [...(nextText || '')];
+    let commonLength = 0;
+    while (
+      commonLength < previous.length &&
+      commonLength < next.length &&
+      previous[commonLength] === next[commonLength]
+    ) {
+      commonLength++;
+    }
+
+    // IMEs may revise a composing syllable. Undo only the changed suffix,
+    // then apply the replacement without disturbing text typed before it.
+    for (let i = previous.length; i > commonLength; i--) {
+      this.typingEngine.handleInput('Backspace');
+    }
+    this.commitText(next.slice(commonLength).join(''));
+    this.compositionText = next.join('');
   }
 
   commitText(text) {
@@ -753,6 +783,7 @@ export class TypingApp {
     this.ui.hideResultsModal();
     this.sessionFinished = false;
     this.isComposing = false;
+    this.compositionText = '';
     this.compositionCommit = null;
     clearTimeout(this.compositionCommitTimer);
     this.timer.reset();

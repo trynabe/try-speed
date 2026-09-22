@@ -179,9 +179,12 @@ test('Tab then Enter inside settings does not reset the underlying session', () 
 test('composition updates count once on commit, including the trailing browser input', () => {
   const app = makeApp(60), input = app.ui.hiddenInput;
   input.fire('compositionstart');
-  for (const data of ['a', 'ab', 'abc']) input.fire('input', { data, inputType: 'insertCompositionText', isComposing: true });
+  for (const [data, index] of [['a', 1], ['ab', 2], ['abc', 3]]) {
+    input.fire('input', { data, inputType: 'insertCompositionText', isComposing: true });
+    assert.equal(app.typingEngine.currentIndex, index);
+  }
   input.fire('keydown', { key: 'a', isComposing: true });
-  assert.equal(app.typingEngine.currentIndex, 0);
+  assert.equal(app.typingEngine.currentIndex, 3);
   input.fire('compositionend', { data: 'abc' });
   input.fire('input', { data: 'abc', inputType: 'insertFromComposition' });
   assert.equal(app.typingEngine.currentIndex, 3);
@@ -202,6 +205,20 @@ test('Thai composition falls back to the textarea value and ignores a data-less 
   assert.equal(app.typingEngine.getMetrics().correctChars, 'กุ้ง'.length);
   input.fire('input', { data: 'น้ำ', inputType: 'insertText' });
   assert.equal(app.typingEngine.currentIndex, 'กุ้งน้ำ'.length);
+  assert.equal(app.typingEngine.getMetrics().incorrectChars, 0);
+});
+
+test('Thai IME can revise a composing vowel without corrupting the character position', () => {
+  const app = makeApp(60), input = app.ui.hiddenInput;
+  app.currentText = 'กุ้งต่อ'; app.restartCurrentText();
+  input.fire('compositionstart');
+  for (const data of ['กุ', 'กู', 'กุ้', 'กุ้ง']) {
+    input.fire('input', { data, inputType: 'insertCompositionText', isComposing: true });
+  }
+  input.fire('compositionend', { data: 'กุ้ง' });
+  input.fire('input', { data: 'กุ้ง', inputType: 'insertFromComposition' });
+  assert.equal(app.typingEngine.currentIndex, 'กุ้ง'.length);
+  assert.equal(app.typingEngine.getMetrics().correctChars, 'กุ้ง'.length);
   assert.equal(app.typingEngine.getMetrics().incorrectChars, 0);
 });
 
@@ -340,8 +357,10 @@ test('Thai composition commits each vowel and tone mark once and saves language/
   app.currentText = 'กุ้ง น้ำ'; app.restartCurrentText();
   const input = app.ui.hiddenInput;
   input.fire('compositionstart');
-  for (const data of ['ก', 'กุ', 'กุ้', 'กุ้ง']) input.fire('input', { data, inputType: 'insertCompositionText', isComposing: true });
-  assert.equal(app.typingEngine.currentIndex, 0);
+  for (const [data, index] of [['ก', 1], ['กุ', 2], ['กุ้', 3], ['กุ้ง', 4]]) {
+    input.fire('input', { data, inputType: 'insertCompositionText', isComposing: true });
+    assert.equal(app.typingEngine.currentIndex, index);
+  }
   input.fire('compositionend', { data: 'กุ้ง' });
   input.fire('input', { data: 'กุ้ง', inputType: 'insertFromComposition' });
   now = 10000;
