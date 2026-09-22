@@ -74,7 +74,7 @@
 
 /* Word & Character spans */
 .text-display[lang="th"], .practice-note[lang="th"] {
-  /* The global monospace rule is !important, so Thai must explicitly opt out. */
+  /* Every character span inherits this single Thai face and shaping context. */
   font-family: var(--font-thai) !important;
   letter-spacing: 0;
   font-feature-settings: "kern" 1, "liga" 1;
