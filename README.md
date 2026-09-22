@@ -30,7 +30,7 @@ A typing practice web application for English and Thai, with custom durations, i
   - Correct characters highlighted in bright theme colors.
   - Incorrect characters highlighted in red with underline.
   - Dedicated visual markers for mistyped spaces.
-  - Smooth sliding caret with line-scrolling compensation.
+  - Monkeytype-style smooth sliding caret with retargeted easing, idle blink, active glow, and line-scrolling compensation.
 - **Dynamic Scoring**:
   - Words Per Minute (Net WPM), Raw Gross WPM, and Characters Per Minute (CPM).
   - Accuracy percentage.

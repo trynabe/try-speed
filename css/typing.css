@@ -5,6 +5,8 @@
 :root {
   --typing-font-size: 1.55rem;
   --typing-line-height: 2.85rem;
+  --caret-move-duration: 90ms;
+  --caret-move-easing: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .typing-section {
@@ -141,16 +143,20 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 3px;
+  width: 2px;
   height: 1.85rem;
   background-color: var(--caret-color);
-  border-radius: 2px;
-  box-shadow: 0 0 8px var(--caret-color);
+  border-radius: 999px;
+  box-shadow: 0 0 6px var(--caret-color);
   pointer-events: none;
   z-index: 5;
   transform: translate3d(0, 0, 0);
-  transition: transform 0.045s cubic-bezier(0.2, 0.8, 0.2, 1);
-  animation: caretBlink 1.1s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  transition:
+    transform var(--caret-move-duration) var(--caret-move-easing),
+    opacity 120ms ease,
+    width 120ms ease,
+    box-shadow 120ms ease;
+  animation: caretBlink 1.05s infinite ease-in-out;
   will-change: transform;
 }
 
@@ -158,11 +164,20 @@
 .caret.typing {
   animation: none;
   opacity: 1;
+  width: 3px;
+  box-shadow: 0 0 11px var(--caret-color);
 }
 
 @keyframes caretBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    transition: none;
+    animation: none;
+  }
 }
 
 /* Focus Overlay */
