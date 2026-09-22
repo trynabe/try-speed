@@ -95,9 +95,14 @@ export class TypingApp {
       });
       input.addEventListener('compositionend', (e) => {
         this.isComposing = false;
-        this.commitText(e.data || '');
+        // Some Thai IMEs leave `event.data` empty (or only expose the last
+        // combining mark) while the textarea contains the complete commit.
+        // Prefer the actual input value so no vowel/tone mark is lost.
+        const inputValue = this.getPendingInputText();
+        const committedText = inputValue || e.data || '';
+        this.commitText(committedText);
         // Some browsers emit one final input immediately after compositionend.
-        this.compositionCommit = e.data;
+        this.compositionCommit = committedText || null;
         clearTimeout(this.compositionCommitTimer);
         this.compositionCommitTimer = setTimeout(() => { this.compositionCommit = null; }, 0);
         this.resetInput();
@@ -603,8 +608,11 @@ export class TypingApp {
       return;
     }
 
-    // Ignore Grave Accent / Tilde (universal Thai/EN language switch key in Windows)
-    if (e.key === '`' || e.key === '~' || e.code === 'Backquote') {
+    // Ignore a literal Grave Accent / Tilde produced by the Windows language
+    // switch, unless it is the character the exercise currently expects.
+    // Do not block by physical `code`: Thai layouts can map Backquote to a
+    // different, valid character.
+    if ((e.key === '`' || e.key === '~') && !this.isExpectedCharacter(e.key)) {
       e.preventDefault();
       return;
     }
@@ -618,13 +626,16 @@ export class TypingApp {
 
   handleMobileInput(e) {
     if (e.isComposing || this.isComposing) return;
-    if (this.compositionCommit != null && e.data === this.compositionCommit) {
+    if (
+      this.compositionCommit != null &&
+      (e.inputType === 'insertFromComposition' || e.data === this.compositionCommit)
+    ) {
       this.compositionCommit = null;
       this.resetInput();
       return;
     }
     this.compositionCommit = null;
-    if (e.data === '`' || e.data === '~') {
+    if ((e.data === '`' || e.data === '~') && !this.isExpectedCharacter(e.data)) {
       this.resetInput();
       return;
     }
@@ -635,6 +646,15 @@ export class TypingApp {
       this.commitText(e.data ?? (value.startsWith('\u200b') ? value.slice(1) : value));
     }
     this.resetInput();
+  }
+
+  getPendingInputText() {
+    const value = this.ui.hiddenInput?.value || '';
+    return value.startsWith('\u200b') ? value.slice(1) : value;
+  }
+
+  isExpectedCharacter(char) {
+    return this.typingEngine.charStates[this.typingEngine.currentIndex]?.char === char;
   }
 
   commitText(text) {

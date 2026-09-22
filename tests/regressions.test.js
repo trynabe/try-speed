@@ -191,6 +191,20 @@ test('composition updates count once on commit, including the trailing browser i
   assert.equal(app.typingEngine.currentIndex, 4);
 });
 
+test('Thai composition falls back to the textarea value and ignores a data-less trailing input', () => {
+  const app = makeApp(60), input = app.ui.hiddenInput;
+  app.currentText = 'กุ้งน้ำ'; app.restartCurrentText();
+  input.fire('compositionstart');
+  input.value = '\u200bกุ้ง';
+  input.fire('compositionend', { data: '' });
+  input.fire('input', { data: null, inputType: 'insertFromComposition' });
+  assert.equal(app.typingEngine.currentIndex, 'กุ้ง'.length);
+  assert.equal(app.typingEngine.getMetrics().correctChars, 'กุ้ง'.length);
+  input.fire('input', { data: 'น้ำ', inputType: 'insertText' });
+  assert.equal(app.typingEngine.currentIndex, 'กุ้งน้ำ'.length);
+  assert.equal(app.typingEngine.getMetrics().incorrectChars, 0);
+});
+
 test('fast distinct input events are not dropped; desktop and mobile deletion work', () => {
   const app = makeApp(60), input = app.ui.hiddenInput;
   input.fire('keydown', { key: 'a' }); input.fire('input', { data: 'a', inputType: 'insertText' });
@@ -302,6 +316,22 @@ test('language changes persist, reset an active session, and generate Thai text'
   assert.equal(app.typingEngine.currentIndex, 0);
   app.setLanguage('en');
   assert.doesNotMatch(app.currentText, /[ก-๙]/u);
+});
+
+test('language-switch characters are ignored only when they are not expected', () => {
+  const app = makeApp(60), input = app.ui.hiddenInput;
+  app.currentText = '~`_a'; app.restartCurrentText();
+  input.fire('keydown', { key: '~', code: 'Backquote' });
+  input.fire('input', { data: '~', inputType: 'insertText' });
+  input.fire('keydown', { key: '`', code: 'Backquote' });
+  input.fire('input', { data: '`', inputType: 'insertText' });
+  assert.equal(app.typingEngine.currentIndex, 2);
+  const mappedKey = input.fire('keydown', { key: '_', code: 'Backquote' });
+  assert.equal(mappedKey.defaultPrevented, undefined);
+  input.fire('input', { data: '_', inputType: 'insertText' });
+  input.fire('input', { data: 'a', inputType: 'insertText' });
+  assert.equal(app.typingEngine.currentIndex, 4);
+  assert.equal(app.typingEngine.getMetrics().incorrectChars, 0);
 });
 
 test('Thai composition commits each vowel and tone mark once and saves language/CPM', () => {
