@@ -1,10 +1,10 @@
 /* ==========================================================================
-   Typing Arena & Text Display — Fixed 3-Line Viewport
+   Typing Arena & Text Display — Fixed 4-Line Viewport
    ========================================================================== */
 
 :root {
-  --typing-font-size: 1.55rem;
-  --typing-line-height: 2.85rem;
+  --typing-font-size: 1.7rem;
+  --typing-line-height: 3.15rem;
   --caret-move-duration: 90ms;
   --caret-move-easing: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -12,7 +12,8 @@
 .typing-section {
   position: relative;
   width: 100%;
-  margin: 1.5rem 0;
+  flex: 1;
+  margin: 0.75rem 0 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
@@ -21,20 +22,14 @@
 /* Arena Container */
 .typing-arena {
   position: relative;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 1.75rem 2.25rem;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--typing-line-height) * 4 + 1rem);
+  padding: 0.5rem 0;
   cursor: text;
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   overflow: hidden;
   user-select: none;
-}
-
-.typing-arena:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 /* Hidden Keystroke Input (Mobile & Desktop Accessible) */
@@ -55,19 +50,22 @@
   font-size: 16px; /* Prevents iOS auto-zoom on input focus */
 }
 
-/* Text Container: Exactly 3 full lines visible */
+/* Text Container: Exactly 4 full lines visible */
 .text-display {
   position: relative;
+  width: 100%;
   font-family: var(--font-mono);
   font-size: var(--typing-font-size);
   line-height: var(--typing-line-height);
   letter-spacing: 0.02em;
-  height: calc(var(--typing-line-height) * 3);
-  max-height: calc(var(--typing-line-height) * 3);
+  height: calc(var(--typing-line-height) * 4);
+  max-height: calc(var(--typing-line-height) * 4);
   overflow: hidden;
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-content: flex-start;
+  text-align: center;
   user-select: none;
   scroll-behavior: smooth;
   /* isolate the text box from the rest of the page's layout/paint work */
@@ -75,7 +73,7 @@
 }
 
 /* Word & Character spans */
-.text-display[lang="th"], .practice-note[lang="th"] {
+.text-display[lang="th"] {
   /* Every character span inherits this single Thai face and shaping context. */
   font-family: var(--font-thai) !important;
   letter-spacing: 0;
@@ -85,8 +83,27 @@
 
 .text-display[lang="th"] .grapheme {
   display: inline-block;
+  position: relative;
   line-height: 1.8;
   white-space: nowrap;
+}
+
+/* Show typed code points over the muted target glyph, leaving untyped marks muted. */
+.text-display[lang="th"] .grapheme-feedback {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--correct);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.text-display[lang="th"] .grapheme-feedback::before {
+  content: attr(data-typed-prefix);
+}
+
+.text-display[lang="th"] .grapheme-feedback.typed-incorrect {
+  color: var(--incorrect);
 }
 
 /* Inline mark spans share their base glyph's shaping run and never wrap alone. */
@@ -97,7 +114,6 @@
 }
 
 .practice-note { font-size: 0.85rem; color: var(--text-muted); line-height: 1.7; }
-.cpm-stat { color: var(--text-muted); font-size: 0.85rem; margin-top: 0.25rem; }
 
 .word {
   display: inline-flex;
@@ -184,10 +200,9 @@
 .focus-overlay {
   position: absolute;
   inset: 0;
-  background: var(--bg-surface);
+  background: transparent;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -228,12 +243,8 @@
 /* Responsive typography & viewport */
 @media (max-width: 768px) {
   :root {
-    --typing-font-size: 1.25rem;
-    --typing-line-height: 2.35rem;
-  }
-
-  .typing-arena {
-    padding: 1.25rem 1.25rem;
+    --typing-font-size: 1.35rem;
+    --typing-line-height: 2.5rem;
   }
 
   .caret {
@@ -243,8 +254,8 @@
 
 @media (max-width: 480px) {
   :root {
-    --typing-font-size: 1.1rem;
-    --typing-line-height: 2.1rem;
+    --typing-font-size: 1.2rem;
+    --typing-line-height: 2.3rem;
   }
 
   .caret {

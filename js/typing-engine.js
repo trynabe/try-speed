@@ -3,10 +3,15 @@
  * Handles typing state, character-by-character matching, backspace, accuracy, and WPM.
  */
 
+import { splitGraphemes } from './text-layout.js';
+
 export class TypingEngine {
   constructor({ onStateChange, onMetricsChange, onFirstKeystroke, onComplete, onSound, beforeInput, onTextExhausted } = {}) {
     this.targetText = '';
     this.charStates = []; // Array of { char: string, state: 'pending'|'correct'|'incorrect'|'extra' }
+    this.graphemeBounds = [];
+    this.inputHistory = [];
+    this.isThai = false;
     this.currentIndex = 0;
     this.hasStarted = false;
     this.isCompleted = false;
@@ -36,6 +41,10 @@ export class TypingEngine {
       char,
       state: 'pending'
     }));
+    this.isThai = /[\u0e00-\u0e7f]/u.test(text);
+    this.graphemeBounds = [];
+    if (this.isThai) this.appendGraphemeBounds(text, 0);
+    this.inputHistory = [];
     this.currentIndex = 0;
     this.hasStarted = false;
     this.isCompleted = false;
@@ -77,22 +86,23 @@ export class TypingEngine {
       return;
     }
 
-    const expectedChar = this.charStates[this.currentIndex].char;
-    const isCorrect = key === expectedChar;
+    const targetIndex = this.getTargetIndex(key);
+    const isCorrect = key === this.charStates[targetIndex].char;
 
     this.totalKeystrokes++;
     if (isCorrect) {
       this.correctKeystrokes++;
       this.correctCharsCount++;
-      this.charStates[this.currentIndex].state = 'correct';
+      this.charStates[targetIndex].state = 'correct';
       this.onSound(false);
     } else {
       this.incorrectKeystrokes++;
       this.incorrectCharsCount++;
-      this.charStates[this.currentIndex].state = 'incorrect';
+      this.charStates[targetIndex].state = 'incorrect';
       this.onSound(true);
     }
 
+    this.inputHistory.push(targetIndex);
     this.currentIndex++;
 
     // Infinite sessions may append another chunk without resetting counters.
@@ -112,33 +122,15 @@ export class TypingEngine {
     if (this.isCompleted || this.currentIndex === 0) return;
 
     if (ctrlKey) {
-      // Delete whole word back
-      // Step back at least one
-      let targetIndex = this.currentIndex - 1;
-      // Skip trailing spaces if any
-      while (targetIndex > 0 && this.charStates[targetIndex].char === ' ') {
-        const prev = this.charStates[targetIndex].state;
-        if (prev === 'correct') this.correctCharsCount--;
-        else if (prev === 'incorrect') this.incorrectCharsCount--;
-        this.charStates[targetIndex].state = 'pending';
-        targetIndex--;
+      // Undo the actual input order so swapped Thai marks return to pending.
+      while (this.inputHistory.length && this.charStates[this.inputHistory.at(-1)].char === ' ') {
+        this.undoLastInput();
       }
-      // Delete until space or start
-      while (targetIndex >= 0 && this.charStates[targetIndex].char !== ' ') {
-        const prev = this.charStates[targetIndex].state;
-        if (prev === 'correct') this.correctCharsCount--;
-        else if (prev === 'incorrect') this.incorrectCharsCount--;
-        this.charStates[targetIndex].state = 'pending';
-        targetIndex--;
+      while (this.inputHistory.length && this.charStates[this.inputHistory.at(-1)].char !== ' ') {
+        this.undoLastInput();
       }
-      this.currentIndex = Math.max(0, targetIndex + 1);
     } else {
-      // Single character backspace
-      this.currentIndex--;
-      const prev = this.charStates[this.currentIndex].state;
-      if (prev === 'correct') this.correctCharsCount--;
-      else if (prev === 'incorrect') this.incorrectCharsCount--;
-      this.charStates[this.currentIndex].state = 'pending';
+      this.undoLastInput();
     }
 
     this.onStateChange(this.getMetrics());
@@ -194,8 +186,46 @@ export class TypingEngine {
 
   appendText(text) {
     if (this.isCompleted) return;
+    const start = this.charStates.length;
     this.targetText += text;
     this.charStates.push(...text.split('').map(char => ({ char, state: 'pending' })));
+    if (this.isThai) this.appendGraphemeBounds(text, start);
+  }
+
+  appendGraphemeBounds(text, offset) {
+    for (const cluster of splitGraphemes(text, 'th')) {
+      const end = offset + cluster.length;
+      if (cluster.length > 1) {
+        const bounds = { start: offset, end };
+        for (let i = offset; i < end; i++) this.graphemeBounds[i] = bounds;
+      }
+      offset = end;
+    }
+  }
+
+  getTargetIndex(key) {
+    const bounds = this.graphemeBounds[this.currentIndex];
+    if (!bounds || this.currentIndex === bounds.start) return this.currentIndex;
+
+    // After the base letter, Thai combining marks in the same grapheme may
+    // arrive in either order. Match an untyped target mark before assigning an error.
+    for (let i = bounds.start + 1; i < bounds.end; i++) {
+      if (this.charStates[i].state === 'pending' && this.charStates[i].char === key) return i;
+    }
+    for (let i = bounds.start + 1; i < bounds.end; i++) {
+      if (this.charStates[i].state === 'pending') return i;
+    }
+    return this.currentIndex;
+  }
+
+  undoLastInput() {
+    const targetIndex = this.inputHistory.pop();
+    if (targetIndex === undefined) return;
+    const prev = this.charStates[targetIndex].state;
+    if (prev === 'correct') this.correctCharsCount--;
+    else if (prev === 'incorrect') this.incorrectCharsCount--;
+    this.charStates[targetIndex].state = 'pending';
+    this.currentIndex--;
   }
 
   finish(seconds) {

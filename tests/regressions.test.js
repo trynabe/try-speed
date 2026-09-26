@@ -5,6 +5,7 @@ import { Timer } from '../js/timer.js';
 import { StorageManager } from '../js/storage.js';
 import { TextGenerator } from '../js/text-generator.js';
 import { UIController } from '../js/ui.js';
+import { splitGraphemes } from '../js/text-layout.js';
 
 class Element {
   constructor(id = '') {
@@ -77,7 +78,7 @@ function makeApp(duration = 1) {
     restartBtn: document.getElementById('restart-btn'),
     modals: [], results: [],
     setSoundState() {}, updateSoundVolumeUI() {}, updateSoundProfileUI() {}, setTheme() {}, setPracticeLanguage() {},
-    updateCustomDurationPill() {}, updateBestBadge() {}, updateTimer(value, elapsed) { this.timer = { value, elapsed }; },
+    updateCustomDurationPill() {}, updateTimer(value, elapsed) { this.timer = { value, elapsed }; },
     updateCharacterStates() {}, updateLiveMetrics(metrics) { this.metrics = metrics; },
     renderText(text) { this.text = text; }, showFocusOverlay() {}, setFinishEnabled(enabled) { this.finishEnabled = enabled; },
     getOpenModal() { return this.modal || null; },
@@ -155,15 +156,40 @@ test('infinite sessions continue past text exhaustion and save only on Finish', 
   assert.equal(StorageManager.getHistory()[0].duration, 'inf');
 });
 
-test('Ctrl+Enter from results closes the modal and resets the session', () => {
+test('Ctrl+Enter from results starts a fresh text and resets the session', () => {
   const app = makeApp();
+  const previousText = app.currentText;
   app.commitText('a'); now = 1000; app.timer.tick();
   windowEvents.keydown({ key: 'Enter', ctrlKey: true, preventDefault() {} });
   assert.equal(app.ui.getOpenModal(), null);
   assert.equal(app.sessionFinished, false);
   assert.equal(app.typingEngine.currentIndex, 0);
+  assert.notEqual(app.currentText, previousText);
   app.commitText('a'); now = 2000; app.timer.tick();
   assert.equal(StorageManager.getHistory().length, 2);
+});
+
+test('the icon restart and results restart both generate fresh text', () => {
+  const app = makeApp(60);
+  const originalGenerator = TextGenerator.generateText;
+  let nextText = 0;
+  TextGenerator.generateText = () => `fresh text ${++nextText}`;
+  try {
+    app.commitText('abc');
+    app.ui.restartBtn.fire('click');
+    assert.equal(app.currentText, 'fresh text 1');
+    assert.equal(app.typingEngine.currentIndex, 0);
+    assert.equal(app.ui.text, app.currentText);
+
+    app.ui.modal = app.ui.resultsModal;
+    app.ui.resultsModal.classList.remove('hidden');
+    document.getElementById('res-restart-btn').fire('click');
+    assert.equal(app.currentText, 'fresh text 2');
+    assert.equal(app.ui.getOpenModal(), null);
+    assert.equal(app.typingEngine.currentIndex, 0);
+  } finally {
+    TextGenerator.generateText = originalGenerator;
+  }
 });
 
 test('Tab then Enter inside settings does not reset the underlying session', () => {
@@ -220,6 +246,22 @@ test('Thai IME can revise a composing vowel without corrupting the character pos
   assert.equal(app.typingEngine.currentIndex, 'กุ้ง'.length);
   assert.equal(app.typingEngine.getMetrics().correctChars, 'กุ้ง'.length);
   assert.equal(app.typingEngine.getMetrics().incorrectChars, 0);
+});
+
+test('Thai composition accepts a tone mark before its vowel', () => {
+  const app = makeApp(60), input = app.ui.hiddenInput;
+  app.currentText = 'รู้ ต่อ'; app.restartCurrentText();
+  input.fire('compositionstart');
+  for (const [data, index] of [['ร', 1], ['ร้', 2], ['รู้', 3]]) {
+    input.value = `\u200b${data}`;
+    input.fire('input', { data, inputType: 'insertCompositionText', isComposing: true });
+    assert.equal(app.typingEngine.currentIndex, index);
+  }
+  input.fire('compositionend', { data: 'รู้' });
+  input.fire('input', { data: 'รู้', inputType: 'insertFromComposition' });
+  assert.equal(app.typingEngine.getMetrics().correctChars, 3);
+  assert.equal(app.typingEngine.getMetrics().incorrectChars, 0);
+  assert.deepEqual(app.typingEngine.charStates.slice(0, 3).map(({ state }) => state), ['correct', 'correct', 'correct']);
 });
 
 test('fast distinct input events are not dropped; desktop and mobile deletion work', () => {
@@ -439,4 +481,140 @@ test('updateCharacterStates efficiently updates targeted range on keystrokes and
   ui.updateCharacterStates(charStates, 0);
   assert.equal(charElements[0].className, 'char pending active-char');
   assert.equal(charElements[1].className, 'char pending');
+});
+
+test('caret stays at text height while waiting for Space in English and Thai', () => {
+  for (const language of ['en', 'th']) {
+    const ui = Object.create(UIController.prototype);
+    const word = { classList: { contains: () => false }, offsetHeight: 46 };
+    const cluster = { classList: { contains: name => name === 'grapheme' }, offsetLeft: 0, offsetTop: 8, offsetWidth: 16, offsetHeight: 34 };
+    const makeChar = (parentElement, left, top, width, height) => ({ parentElement, offsetLeft: left, offsetTop: top, offsetWidth: width, offsetHeight: height });
+    ui.practiceLanguage = language;
+    ui.charElements = language === 'th'
+      ? [makeChar(cluster, 0, 0, 0, 0), makeChar(cluster, 0, 0, 0, 0), makeChar(word, 16, 22, 10, 0), makeChar(word, 26, 8, 12, 25)]
+      : [makeChar(word, 0, 10, 12, 23), makeChar(word, 12, 10, 12, 23), makeChar(word, 24, 21, 10, 0), makeChar(word, 34, 10, 12, 23)];
+    ui.isSpaceFlags = [false, false, true, false];
+    ui.textDisplay = { querySelector: () => word };
+    ui.caret = { style: {} };
+    ui.measurePositions();
+    assert.equal(ui.charPos[2].top, ui.charPos[1].top, language);
+    assert.equal(ui.charPos[2].left, ui.charElements[2].offsetLeft, language);
+    assert.equal(ui.charPos[3].top, ui.charPos[2].top, language);
+  }
+});
+
+test('Thai typed characters get immediate feedback while untyped marks stay muted', () => {
+  const text = 'แบ่งบัน กุ้ง น้ำ ปี่ รู้';
+  const ui = Object.create(UIController.prototype);
+  ui.charElements = [...text].map(() => {
+    const el = new Element('char');
+    el.className = 'char pending';
+    return el;
+  });
+  ui.isSpaceFlags = [...text].map(char => char === ' ');
+  ui.appliedClasses = [...text].map(char => char === ' ' ? 'char char-space pending' : 'char pending');
+  ui.graphemeBounds = [];
+  ui.prevIndex = null;
+  ui.updateCaretPosition = () => {};
+  let offset = 0;
+  for (const cluster of splitGraphemes(text, 'th')) {
+    const end = offset + cluster.length;
+    if (cluster !== ' ') {
+      const bounds = { start: offset, end };
+      if (cluster.length > 1) bounds.feedback = new Element('feedback');
+      for (let i = offset; i < end; i++) ui.graphemeBounds[i] = bounds;
+    }
+    offset = end;
+  }
+
+  const states = [...text].map(char => ({ char, state: 'pending' }));
+  let index = 0;
+  const type = (state = 'correct') => {
+    states[index++].state = state;
+    ui.updateCharacterStates(states, index);
+  };
+  const classAt = position => ui.charElements[position].className;
+  ui.updateCharacterStates(states, index);
+
+  type(); // แ
+  type('incorrect'); // wrong บ, while ่ is still untyped
+  assert.match(classAt(1), / pending/);
+  assert.equal(ui.graphemeBounds[1].feedback.dataset.typedPrefix, 'บ');
+  assert.equal(ui.graphemeBounds[1].feedback.classList.contains('typed-incorrect'), true);
+  index--;
+  states[index].state = 'pending';
+  ui.updateCharacterStates(states, index);
+  assert.equal(ui.graphemeBounds[1].feedback.dataset.typedPrefix, '');
+
+  type(); // บ, with ่ still untyped
+  assert.match(classAt(0), / correct/);
+  assert.match(classAt(1), / pending/);
+  assert.match(classAt(2), / pending/);
+  assert.equal(ui.graphemeBounds[1].feedback.dataset.typedPrefix, 'บ');
+  assert.equal(ui.graphemeBounds[1].feedback.classList.contains('typed-incorrect'), false);
+  type(); // ่ completes บ่
+  assert.match(classAt(1), / correct/);
+  assert.match(classAt(2), / correct/);
+  assert.equal(ui.graphemeBounds[1].feedback.dataset.typedPrefix, '');
+
+  while (index < text.indexOf('ก')) type();
+  type(); // ก, with ุ้ still untyped
+  type(); // ุ, with ้ still untyped
+  const ko = text.indexOf('ก');
+  assert.match(classAt(ko), / pending/);
+  assert.match(classAt(ko + 1), / pending/);
+  assert.match(classAt(ko + 2), / pending/);
+  assert.equal(ui.graphemeBounds[ko].feedback.dataset.typedPrefix, 'กุ');
+  type('incorrect'); // wrong tone mark colors the whole glyph red
+  assert.match(classAt(ko), / incorrect/);
+  assert.match(classAt(ko + 2), / incorrect/);
+
+  index--;
+  states[index].state = 'pending';
+  ui.updateCharacterStates(states, index);
+  assert.match(classAt(ko), / pending/);
+  assert.match(classAt(ko + 2), / pending/);
+  assert.equal(ui.graphemeBounds[ko].feedback.dataset.typedPrefix, 'กุ');
+  type();
+  assert.match(classAt(ko), / correct/);
+  assert.match(classAt(ko + 2), / correct/);
+
+  while (index < text.indexOf('น้ำ')) type();
+  const nam = text.indexOf('น้ำ');
+  type(); // น
+  assert.equal(ui.graphemeBounds[nam].feedback.dataset.typedPrefix, 'น');
+  type(); // ้
+  assert.equal(ui.graphemeBounds[nam].feedback.dataset.typedPrefix, 'น้');
+  type(); // ำ
+  assert.equal(ui.graphemeBounds[nam].feedback.dataset.typedPrefix, '');
+
+  while (index < text.indexOf('ปี่')) type();
+  const pi = text.indexOf('ปี่');
+  type(); // ป
+  assert.equal(ui.graphemeBounds[pi].feedback.dataset.typedPrefix, 'ป');
+  type(); // ี
+  assert.equal(ui.graphemeBounds[pi].feedback.dataset.typedPrefix, 'ปี');
+  type(); // ่
+  assert.equal(ui.graphemeBounds[pi].feedback.dataset.typedPrefix, '');
+
+  while (index < text.indexOf('รู้')) type();
+  const ru = text.indexOf('รู้');
+  type(); // ร
+  states[ru + 2].state = 'correct'; // ้ before ู
+  index++;
+  ui.updateCharacterStates(states, index);
+  assert.equal(ui.graphemeBounds[ru].feedback.dataset.typedPrefix, 'ร้');
+  assert.match(classAt(ru + 1), / pending/);
+  states[ru + 1].state = 'correct'; // ู completes the grapheme
+  index++;
+  ui.updateCharacterStates(states, index);
+  assert.equal(ui.graphemeBounds[ru].feedback.dataset.typedPrefix, '');
+  assert.match(classAt(ru), / correct/);
+  assert.match(classAt(ru + 1), / correct/);
+  assert.match(classAt(ru + 2), / correct/);
+
+  for (const word of ['น้ำ', 'ปี่']) {
+    const start = text.indexOf(word);
+    for (let i = start; i < start + 3; i++) assert.match(classAt(i), / correct/);
+  }
 });

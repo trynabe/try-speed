@@ -17,7 +17,6 @@ export class UIController {
     this.accuracyDisplay = document.getElementById('accuracy-display');
     this.correctDisplay = document.getElementById('correct-display');
     this.incorrectDisplay = document.getElementById('incorrect-display');
-    this.bestWpmBadge = document.getElementById('best-wpm-badge');
 
     // Modals
     this.resultsModal = document.getElementById('results-modal');
@@ -50,12 +49,12 @@ export class UIController {
     this.soundBtn = document.getElementById('sound-btn');
     this.customDurationPill = document.getElementById('custom-duration-pill');
     this.restartBtn = document.getElementById('restart-btn');
-    this.newTextBtn = document.getElementById('new-text-btn');
     this.finishBtn = document.getElementById('finish-btn');
 
     // Caret element
     this.caret = null;
     this.charElements = [];
+    this.graphemeBounds = [];
 
     // Render caches — avoid touching the DOM / reading layout on every keystroke
     this.isSpaceFlags = [];
@@ -90,6 +89,7 @@ export class UIController {
     if (!this.textDisplay) return;
 
     this.charElements = [];
+    this.graphemeBounds = [];
     this.isSpaceFlags = [];
     this.appliedClasses = [];
     this.prevIndex = null;
@@ -110,6 +110,7 @@ export class UIController {
 
       const clusters = this.practiceLanguage === 'th' ? splitGraphemes(word, 'th') : word.split('');
       for (const cluster of clusters) {
+        const clusterStart = this.charElements.length;
         const container = this.practiceLanguage === 'th' ? document.createElement('span') : wordSpan;
         if (container !== wordSpan) {
           container.className = 'grapheme';
@@ -123,6 +124,17 @@ export class UIController {
           this.charElements.push(charSpan);
           this.isSpaceFlags.push(false);
           this.appliedClasses.push('char pending');
+        }
+        if (this.practiceLanguage === 'th') {
+          const bounds = { start: clusterStart, end: this.charElements.length };
+          if (bounds.end - bounds.start > 1) {
+            const feedback = document.createElement('span');
+            feedback.className = 'grapheme-feedback';
+            feedback.setAttribute('aria-hidden', 'true');
+            container.appendChild(feedback);
+            bounds.feedback = feedback;
+          }
+          for (let i = bounds.start; i < bounds.end; i++) this.graphemeBounds[i] = bounds;
         }
       }
 
@@ -168,9 +180,12 @@ export class UIController {
       const cluster = el.parentElement.classList.contains('grapheme') ? el.parentElement : null;
       const geometry = cluster || el;
       const insideCluster = cluster && this.charElements[i - 1]?.parentElement === cluster;
+      // A space has zero glyph height, so its offsetTop sits below the text
+      // baseline. Keep the caret on the preceding character's line.
+      const top = this.isSpaceFlags[i] && i > 0 ? this.charPos[i - 1].top : geometry.offsetTop;
       this.charPos[i] = {
         left: geometry.offsetLeft + (insideCluster ? geometry.offsetWidth : 0),
-        top: geometry.offsetTop,
+        top,
         right: geometry.offsetLeft + geometry.offsetWidth
       };
     }
@@ -196,15 +211,41 @@ export class UIController {
       start = Math.max(0, Math.min(this.prevIndex, currentIndex) - 2);
       end = Math.min(n - 1, Math.max(this.prevIndex, currentIndex) + 2);
     }
+    // A Thai mark shares one rendered glyph with its base. Refresh the whole
+    // grapheme when one code point changes, including after Backspace.
+    start = this.graphemeBounds?.[start]?.start ?? start;
+    end = (this.graphemeBounds?.[end]?.end ?? end + 1) - 1;
     this.prevIndex = currentIndex;
 
+    let previousBounds = null;
+    let clusterState = 'pending';
     for (let i = start; i <= end; i++) {
       const stateObj = charStates[i];
       if (!stateObj) continue;
 
       let cls = this.isSpaceFlags[i] ? 'char char-space' : 'char';
-
-      if (i < currentIndex) {
+      const bounds = this.graphemeBounds?.[i];
+      if (bounds) {
+        if (bounds !== previousBounds) {
+          previousBounds = bounds;
+          let allCorrect = true;
+          let hasError = false;
+          const typedChars = [];
+          for (let j = bounds.start; j < bounds.end; j++) {
+            const state = charStates[j]?.state;
+            allCorrect &&= state === 'correct';
+            if (state === 'incorrect') hasError = true;
+            if (state !== 'pending' && state !== undefined) typedChars.push(charStates[j].char);
+          }
+          const complete = typedChars.length === bounds.end - bounds.start;
+          clusterState = complete ? (hasError ? 'incorrect' : allCorrect ? 'correct' : 'pending') : 'pending';
+          if (bounds.feedback) {
+            bounds.feedback.dataset.typedPrefix = complete ? '' : typedChars.join('');
+            bounds.feedback.classList.toggle('typed-incorrect', hasError && !complete);
+          }
+        }
+        cls += ` ${clusterState}`;
+      } else if (i < currentIndex) {
         cls += stateObj.state === 'correct' ? ' correct' : ' incorrect';
       } else {
         cls += ' pending';
@@ -241,7 +282,7 @@ export class UIController {
 
     const pitch = this.linePitch || 42;
     const currentLineIndex = Math.max(0, Math.round(top / pitch));
-    const targetScrollTop = currentLineIndex >= 2 ? (currentLineIndex - 1) * pitch : 0;
+    const targetScrollTop = currentLineIndex >= 3 ? (currentLineIndex - 2) * pitch : 0;
 
     // Write-only: never read scrollTop back, that would force a reflow
     if (this.scrollTopCache !== targetScrollTop) {
@@ -344,21 +385,12 @@ export class UIController {
     }
   }
 
-  updateBestBadge(bestScore) {
-    if (!this.bestWpmBadge) return;
-    if (bestScore && bestScore.wpm > 0) {
-      this.bestWpmBadge.textContent = `${bestScore.wpm} WPM (${bestScore.accuracy}%)`;
-    } else {
-      this.bestWpmBadge.textContent = '--';
-    }
-  }
-
   showResultsModal(sessionData, isNewBest = false) {
     if (!this.resultsModal) return;
 
     document.getElementById('res-wpm').textContent = sessionData.wpm;
     document.getElementById('res-cpm').textContent = sessionData.cpm;
-    document.getElementById('res-language').textContent = sessionData.language === 'th' ? 'TH · ภาษาไทย' : 'EN · English';
+    document.getElementById('res-language').textContent = sessionData.language === 'th' ? 'TH · Thai' : 'EN · English';
     document.getElementById('res-raw-wpm').textContent = sessionData.rawWpm;
     document.getElementById('res-accuracy').textContent = `${sessionData.accuracy}%`;
     document.getElementById('res-correct').textContent = sessionData.correctChars;
@@ -666,14 +698,5 @@ export class UIController {
     this.practiceLanguage = language === 'th' ? 'th' : 'en';
     this.textDisplay?.setAttribute('lang', this.practiceLanguage);
     this.hiddenInput?.setAttribute('lang', this.practiceLanguage);
-    const note = document.getElementById('practice-language-note');
-    if (note) {
-      note.lang = this.practiceLanguage;
-      note.textContent = this.practiceLanguage === 'th'
-        ? 'สลับแป้นพิมพ์เป็นภาษาไทย · พิมพ์ทีละคำ แล้วกด Space · CPM = ตัวอักษรที่ถูกต้องต่อนาที (รวมสระและวรรณยุกต์)'
-        : 'Type each word, then press Space. CPM = correct characters per minute.';
-    }
-    const badgeLabel = document.getElementById('best-mode-label');
-    if (badgeLabel) badgeLabel.textContent = `${this.practiceLanguage.toUpperCase()} Best:`;
   }
 }

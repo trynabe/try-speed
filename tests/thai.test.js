@@ -88,6 +88,59 @@ test('Thai backspace removes one mark and Ctrl+Backspace removes a space-delimit
   assert.equal(engine.getMetrics().correctChars, 'กุ้ง '.length);
 });
 
+test('Thai vowels and tone marks match in either input order', () => {
+  const engine = new TypingEngine();
+  const target = 'รู้ น้ำ ปี่ กุ้ง ต่อ';
+  const alternateOrder = 'รู้ นำ้ ป่ี กุ้ง ';
+  engine.setText(target);
+  for (const char of alternateOrder) engine.handleInput(char);
+
+  assert.equal(engine.currentIndex, alternateOrder.length);
+  assert.equal(engine.correctCharsCount, alternateOrder.length);
+  assert.equal(engine.incorrectCharsCount, 0);
+  assert.equal(engine.getMetrics().accuracy, 100);
+  assert.ok(engine.charStates.slice(0, alternateOrder.length).every(({ state }) => state === 'correct'));
+  assert.equal(engine.charStates[alternateOrder.length].char, 'ต');
+});
+
+test('Thai Backspace undoes the last entered mark after a swapped order', () => {
+  const engine = new TypingEngine();
+  engine.setText('รู้ ต่อ');
+  for (const char of 'ร้') engine.handleInput(char);
+  assert.equal(engine.currentIndex, 2);
+  assert.equal(engine.charStates[1].state, 'pending'); // ู
+  assert.equal(engine.charStates[2].state, 'correct'); // ้
+
+  engine.handleInput('Backspace');
+  assert.equal(engine.currentIndex, 1);
+  assert.equal(engine.charStates[2].state, 'pending');
+  engine.handleInput('้');
+  engine.handleInput('ู');
+  assert.ok(engine.charStates.slice(0, 3).every(({ state }) => state === 'correct'));
+
+  engine.handleInput('Backspace');
+  assert.equal(engine.charStates[1].state, 'pending'); // Last input was ู
+  assert.equal(engine.charStates[2].state, 'correct');
+  engine.handleInput('ู');
+  engine.handleInput(' ');
+  engine.handleInput('Backspace', true);
+  assert.equal(engine.currentIndex, 0);
+  assert.ok(engine.charStates.slice(0, 4).every(({ state }) => state === 'pending'));
+});
+
+test('repeated Thai mark is an error until corrected', () => {
+  const engine = new TypingEngine();
+  engine.setText('รู้ ต่อ');
+  for (const char of 'ร้้') engine.handleInput(char);
+  assert.equal(engine.charStates[1].state, 'incorrect'); // ู slot
+  assert.equal(engine.charStates[2].state, 'correct');
+  engine.handleInput('Backspace');
+  engine.handleInput('ู');
+  assert.ok(engine.charStates.slice(0, 3).every(({ state }) => state === 'correct'));
+  assert.equal(engine.getMetrics().correctChars, 3);
+  assert.ok(engine.getMetrics().accuracy < 100);
+});
+
 test('English legacy records migrate without leaking into Thai personal bests', () => {
   const data = new Map();
   globalThis.localStorage = { getItem:key=>data.get(key)??null, setItem:(key,value)=>data.set(key,value), removeItem:key=>data.delete(key) };

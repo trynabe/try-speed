@@ -272,7 +272,7 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   flex: 1;
-  justify-content: space-between;
+  justify-content: flex-start;
   min-height: 100vh;
   min-height: 100dvh;
 }
@@ -333,23 +333,6 @@ button, input, select, textarea {
   gap: 0.65rem;
 }
 
-.best-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  padding: 0.35rem 0.8rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.82rem;
-  color: var(--text-muted);
-}
-
-.best-badge strong {
-  color: var(--accent);
-  font-weight: 700;
-}
-
 .icon-btn {
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
@@ -377,29 +360,18 @@ button, input, select, textarea {
 }
 
 /* ==========================================================================
-   Footer & Keyboard Hints
+   Footer
    ========================================================================== */
 .app-footer {
+  margin-top: auto;
   padding-top: 1.25rem;
   border-top: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  text-align: center;
   color: var(--text-muted);
   font-size: 0.82rem;
-}
-
-.shortcuts-hint {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  flex-wrap: wrap;
-}
-
-.kbd-shortcut {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
 }
 
 kbd {

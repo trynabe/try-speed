@@ -7,8 +7,8 @@ import { TextGenerator } from './text-generator.js';
 import { Timer } from './timer.js';
 import { StorageManager } from './storage.js';
 import { SoundEffects } from './audio.js';
-import { TypingEngine } from './typing-engine.js';
-import { UIController } from './ui.js';
+import { TypingEngine } from './typing-engine.js?v=1.1.0';
+import { UIController } from './ui.js?v=1.1.0';
 
 export class TypingApp {
   constructor({ ui = new UIController(), now } = {}) {
@@ -79,7 +79,6 @@ export class TypingApp {
     this.initThemeAndCustomizer();
     this.initSoundModal();
     this.applyActiveSettingsPills();
-    this.updateBestScoreBadge();
     this.loadNewText();
     this.focusInput();
   }
@@ -234,10 +233,7 @@ export class TypingApp {
 
     // Control buttons
     if (this.ui.restartBtn) {
-      this.ui.restartBtn.addEventListener('click', () => this.restartCurrentText());
-    }
-    if (this.ui.newTextBtn) {
-      this.ui.newTextBtn.addEventListener('click', () => this.loadNewText());
+      this.ui.restartBtn.addEventListener('click', () => this.loadNewText());
     }
     document.getElementById('finish-btn')?.addEventListener('click', () => {
       this.finishSession(this.timer.getElapsedSeconds());
@@ -267,7 +263,6 @@ export class TypingApp {
         if (confirm('Are you sure you want to clear all typing history and best scores?')) {
           StorageManager.clearHistory();
           this.refreshAndOpenHistory();
-          this.updateBestScoreBadge();
         }
       });
     }
@@ -293,14 +288,6 @@ export class TypingApp {
     if (resRestartBtn) {
       resRestartBtn.addEventListener('click', () => {
         this.ui.hideResultsModal();
-        this.restartCurrentText();
-      });
-    }
-
-    const resNextBtn = document.getElementById('res-next-btn');
-    if (resNextBtn) {
-      resNextBtn.addEventListener('click', () => {
-        this.ui.hideResultsModal();
         this.loadNewText();
       });
     }
@@ -308,7 +295,7 @@ export class TypingApp {
     // Global keyboard navigation shortcuts
     window.addEventListener('keydown', (e) => {
       if (e.isComposing || this.isComposing) return;
-      // Escape closes modals or resets test
+      // Escape closes modals or restarts with fresh text
       if (e.key === 'Escape') {
         if (this.ui.resultsModal && !this.ui.resultsModal.classList.contains('hidden')) {
           this.ui.hideResultsModal();
@@ -348,7 +335,7 @@ export class TypingApp {
       const modal = this.ui.getOpenModal();
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && (!modal || modal === this.ui.resultsModal)) {
         e.preventDefault();
-        this.restartCurrentText();
+        this.loadNewText();
         return;
       }
 
@@ -723,7 +710,6 @@ export class TypingApp {
     this.settings.duration = duration;
     StorageManager.saveSettings({ duration });
     this.applyActiveSettingsPills();
-    this.updateBestScoreBadge();
     this.loadNewText();
   }
 
@@ -732,7 +718,6 @@ export class TypingApp {
     this.settings.difficulty = difficulty;
     StorageManager.saveSettings({ difficulty });
     this.applyActiveSettingsPills();
-    this.updateBestScoreBadge();
     this.loadNewText();
   }
 
@@ -745,7 +730,6 @@ export class TypingApp {
     this.settings.language = language;
     StorageManager.saveSettings({ language });
     this.applyActiveSettingsPills();
-    this.updateBestScoreBadge();
     this.loadNewText();
   }
 
@@ -767,11 +751,6 @@ export class TypingApp {
       pill.classList.toggle('active', pill.dataset.difficulty === this.settings.difficulty);
       pill.setAttribute('aria-checked', String(pill.dataset.difficulty === this.settings.difficulty));
     });
-  }
-
-  updateBestScoreBadge() {
-    const best = StorageManager.getBestScore(this.settings.difficulty, this.settings.duration, this.settings.language);
-    this.ui.updateBestBadge(best);
   }
 
   loadNewText() {
@@ -824,7 +803,6 @@ export class TypingApp {
     };
 
     StorageManager.saveSession(sessionData);
-    this.updateBestScoreBadge();
 
     const isNewBest = !prevBest || metrics.wpm > prevBest.wpm ||
       (metrics.wpm === prevBest.wpm && metrics.accuracy > prevBest.accuracy);
